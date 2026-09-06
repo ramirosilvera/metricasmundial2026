@@ -273,10 +273,75 @@ export function nombreColor(h: number, s: number, l: number): string {
  *  92) evita blanco puro (l=100 -18 -> 82, aceptable) y negro puro sin
  *  contorno visible (l=0 -18 -> clampeado a 4, no a un negativo sin
  *  sentido para hsl()). */
+/** Saturación "realzada" de un tono derivado (contorno, trama, detalle):
+ *  sube la saturación para que el derivado no se funda con la prenda...
+ *  pero SOLO si la prenda tiene un matiz real que realzar.
+ *
+ *  Bug real encontrado renderizando el catálogo completo (Consejo, ronda
+ *  "los íconos más parecidos a la prenda real", roles modista/asesor de
+ *  color): las tres funciones sumaban saturación siempre, incluso sobre un
+ *  color ACROMÁTICO. Y como todos los negros y grises del catálogo se
+ *  guardan con h=0 (matiz rojo, irrelevante mientras s=0), sumarles
+ *  saturación no los "realzaba": les INVENTABA un matiz rojo. En el render
+ *  real se veía: la raya planchada de un pantalón de vestir negro salía
+ *  marrón rojiza, el perforado del zapato de vestir negro salía anaranjado
+ *  y la trama de cualquier prenda gris salía tibia en vez de gris.
+ *
+ *  Un derivado de un neutro tiene que seguir siendo neutro -- lo que da
+ *  contraste sobre negro/gris es la LUZ, que las tres funciones ya ajustan
+ *  aparte y sigue igual. El umbral es el mismo que usa el motor para
+ *  decidir si un color es neutro (NEUTRO_S_MAX en recommend.ts, duplicado
+ *  acá a propósito por 1 número: recommend importa color, no al revés, y
+ *  no vale invertir esa dependencia). */
+/** Croma HSL real (0-100): `s` desnormalizado por `l`. Fórmula duplicada a
+ *  propósito de `croma` en recommend.ts (ver su comentario largo: es esta
+ *  magnitud, y no `s`, la que dice cuánto color se VE) -- recommend importa
+ *  color, no al revés, y no vale invertir esa dependencia por una línea. */
+function cromaHsl(s: number, l: number): number {
+  return s * (1 - Math.abs((2 * l) / 100 - 1));
+}
+/** Cuánto más color que la prenda puede llegar a mostrar un derivado suyo.
+ *  1.25 = "un poco más vivo, para que se despegue", nunca "otro color". */
+const CROMA_MAX_DERIVADO = 1.25;
+function saturacionDerivada(s: number, l: number, lDerivada: number, delta: number): number {
+  // El derivado siempre se dibuja a OTRA luminosidad que la prenda (más
+  // clara sobre una prenda oscura, más oscura sobre una clara) -- y la
+  // misma `s` rinde MUCHO más croma a media luz que en los extremos. Por
+  // eso el techo se pone sobre el croma del resultado y no sobre su `s`:
+  // es lo único que se corresponde con lo que se ve.
+  //
+  // Los dos casos reales que lo motivaron, encontrados renderizando el
+  // catálogo completo (Consejo, ronda "los íconos más parecidos a la
+  // prenda real", roles modista/asesor de color):
+  //   - "zapatos-cuero-negro" (#1C1210, el negro de cuero que comparten
+  //     los zapatos y los mocasines) tiene s=27 -- por encima de cualquier
+  //     umbral razonable sobre `s` -- pero croma 5: a la vista es negro.
+  //     Aclarado a l=31 conservando su `s`, reaparecía como marrón ÓXIDO
+  //     en el perforado del zapato y en la tira del mocasín.
+  //   - "zapatos-cuero-marron"/"mocasines-marrones" (#6F4E37, croma 22, un
+  //     marrón cuero apagado real) sacaban una costura y una tira NARANJA
+  //     FLÚO: croma 39, casi el doble que el cuero del que salen.
+  // En los dos casos el problema es el mismo y la respuesta también: un
+  // detalle de una prenda es la MISMA tela un poco más clara o más oscura
+  // (un pliegue, una costura, una solapa dada vuelta), nunca otro color.
+  // El contraste que los hace visibles lo da la LUZ, que cada función
+  // ajusta aparte y no se toca acá.
+  const factor = 1 - Math.abs((2 * lDerivada) / 100 - 1);
+  const realzada = Math.min(100, s + delta);
+  if (factor <= 0.01) return realzada;
+  return Math.min(realzada, (cromaHsl(s, l) * CROMA_MAX_DERIVADO) / factor);
+}
+
 export function contornoHsl(h: number, s: number, l: number): string {
-  const s2 = Math.min(100, s + 5);
   const l2 = Math.max(4, Math.min(92, l) - 18);
-  return `hsl(${h} ${s2}% ${l2}%)`;
+  return `hsl(${h} ${redondear(saturacionDerivada(s, l, l2, 5))}% ${l2}%)`;
+}
+
+/** Los tonos derivados salen como string CSS, así que se redondea acá una
+ *  sola vez: un `hsl(10 7.83...% 31%)` es válido pero ilegible en el DOM y
+ *  en cualquier test. */
+function redondear(n: number): number {
+  return Math.round(n * 10) / 10;
 }
 
 /** Tono del PATRÓN de textura (la trama/brillo que dibuja PatronTextura en
@@ -298,9 +363,8 @@ export function contornoHsl(h: number, s: number, l: number): string {
  *  detalleHsl): el patrón es un detalle mucho más fino que un cuello, así
  *  que necesita menos margen para seguir siendo legible por debajo. */
 export function tonoTexturaHsl(h: number, s: number, l: number): string {
-  const s2 = Math.min(100, s + 5);
-  if (l < 25) return `hsl(${h} ${s2}% ${Math.min(85, l + 20)}%)`;
-  return `hsl(${h} ${s2}% ${Math.max(4, l - 18)}%)`;
+  const l2 = l < 25 ? Math.min(85, l + 20) : Math.max(4, l - 18);
+  return `hsl(${h} ${redondear(saturacionDerivada(s, l, l2, 5))}% ${l2}%)`;
 }
 
 /** Tono más oscuro del mismo matiz, para el lado "sombra" de un degradé
@@ -328,5 +392,6 @@ export function luzHsl(h: number, s: number, l: number): string {
  *  contraste garantizado, no por estética. */
 export function detalleHsl(h: number, s: number, l: number): string {
   if (l >= 50) return `hsl(${h} ${s}% ${Math.max(4, l - 25)}%)`;
-  return `hsl(${h} ${Math.min(100, s + 10)}% ${Math.min(92, l + 22)}%)`;
+  const l2 = Math.min(92, l + 22);
+  return `hsl(${h} ${redondear(saturacionDerivada(s, l, l2, 10))}% ${l2}%)`;
 }

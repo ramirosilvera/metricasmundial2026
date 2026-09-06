@@ -535,7 +535,17 @@ export function PrendaShape({
       forma = (
         <>
           <FormaConTextura
-            d="M22 8 L32 14 L42 8 L54 16 L47 26 L42 22 L42 56 L22 56 L22 22 L17 26 L10 16 Z"
+            // escote REDONDO (crew) -- pedido explícito del usuario ("que
+            // los íconos se parezcan más a la prenda real"), revisado como
+            // modista contra el render real del catálogo completo: la
+            // remera venía con el mismo escote en V picado que el sweater
+            // (L32 14, un pico de 6u), y una remera lisa de algodón no
+            // tiene escote en V, tiene cuello a la base redondo. Ahora es
+            // una curva (Q32 17) en vez de dos rectas en pico -- y de paso
+            // es lo que la distingue del sweater, que sí conserva su V
+            // (el escote en V es un arquetipo real de sweater, no de
+            // remera).
+            d="M22 8 Q32 17 42 8 L54 16 L47 26 L42 22 L42 56 L22 56 L22 22 L17 26 L10 16 Z"
             fill={conEstampado ? estampadoUrl! : color}
             stroke={stroke}
             patron={conEstampado ? undefined : patron}
@@ -566,6 +576,32 @@ export function PrendaShape({
       // con estampado: el fill ES el patrón de rayas/cuadros (dos colores
       // reales), sin la capa de textura semitransparente encima (ver el
       // comentario largo de conEstampado más arriba).
+      //
+      // Cuello camisero, tapeta con botones y puños -- pedido explícito del
+      // usuario ("revisá los íconos de las prendas, si se pueden hacer más
+      // similares con la prenda real"), revisado como modista y sastre.
+      // Hueco real y de los más caros del set: hasta esta ronda la camisa
+      // se dibujaba con la MISMA silueta de hombros y escote que la remera
+      // (comparar los dos paths: 24/32/40 contra 22/32/42, prácticamente
+      // el mismo escote) y su único detalle era una línea vertical al
+      // medio -- o sea que la prenda más usada de oficina de todo el
+      // catálogo se leía como una remera con una raya. Un trazo fino no
+      // alcanza a esta escala, el mismo hallazgo que ya se confirmó con
+      // las solapas del saco (ver su comentario más abajo): hace falta una
+      // FORMA rellena.
+      //
+      // Se replica la anatomía real del cuello camisero en las mismas dos
+      // piezas que ya usa el maniquí grande (ver Maniqui.tsx, categoria
+      // "camisa"), a escala de ícono, para que la MISMA prenda no se lea
+      // distinta en las dos vistas:
+      //   1) la TIRA (collar band) que rodea la base del cuello, cerrada
+      //      sobre sí misma -- un cuello abrochado no deja un hueco en el
+      //      medio;
+      //   2) las dos PUNTAS (collar leaves) cayendo sobre el pecho desde
+      //      esa tira, no desde el hombro.
+      // Los botones y los puños son el otro par de señas que ninguna
+      // remera/buzo tiene: una camisa real se abrocha al frente y termina
+      // en un puño, no en un ruedo de manga suelto.
       forma = (
         <>
           <FormaConTextura
@@ -574,7 +610,22 @@ export function PrendaShape({
             stroke={stroke}
             patron={conEstampado ? undefined : patron}
           />
-          <line x1="32" y1="14" x2="32" y2="56" stroke={stroke} />
+          {/* puños -- una línea paralela al ruedo de cada manga, corrida
+              hacia adentro: es donde termina el puño real. Van primero
+              para que el cuello quede por encima si algo se solapa. */}
+          <line x1="49.9" y1="12.7" x2="43.9" y2="22.7" stroke={tonoDetalle} strokeWidth={0.8} />
+          <line x1="14.1" y1="12.7" x2="20.1" y2="22.7" stroke={tonoDetalle} strokeWidth={0.8} />
+          {/* tapeta central + botones. La tapeta arranca en la punta del
+              cuello (y=15), no en el escote pelado como antes. */}
+          <line x1="32" y1="15" x2="32" y2="56" stroke={stroke} />
+          {[24, 33, 42, 51].map((y) => (
+            <circle key={y} cx="32" cy={y} r="0.9" fill={tonoDetalle} />
+          ))}
+          {/* 1) tira del cuello (collar band) */}
+          <path d="M24 6 Q32 2.5 40 6 Q36 8.5 32 9 Q28 8.5 24 6 Z" fill={tonoDetalle} stroke={stroke} strokeWidth={0.5} />
+          {/* 2) puntas del cuello (collar leaves) */}
+          <path d="M24 6 L32 15 L28.5 6.5 Z" fill={tonoDetalle} stroke={stroke} strokeWidth={0.5} />
+          <path d="M40 6 L32 15 L35.5 6.5 Z" fill={tonoDetalle} stroke={stroke} strokeWidth={0.5} />
         </>
       );
       break;
@@ -849,8 +900,20 @@ export function PrendaShape({
       forma = (
         <>
           <FormaConTextura d="M24 6 L32 12 L40 6 L54 16 L47 27 L42 22 L42 58 L22 58 L22 22 L17 27 L10 16 Z" fill={color} stroke={stroke} patron={patron} />
-          <path d="M32 12 L22 28 L32 44 L34 16 Z" fill={solapa} stroke={stroke} />
-          <path d="M32 12 L42 28 L32 44 L30 16 Z" fill={solapa} stroke={stroke} />
+          {/* Solapas más angostas que en la versión anterior (que las
+              hacía llegar las dos hasta x=32, o sea juntarse en el medio y
+              cerrar un ROMBO relleno -- visto en el render real del
+              catálogo, leía como un pañuelo o un cuello cruzado, no como
+              un saco abierto). Un saco real deja ver, entre las dos
+              solapas, la tapeta del cierre del delantero: por eso ahora
+              cada solapa muere en x=30/34 y entre ellas queda una franja
+              del color del propio saco, cerrada abajo por el botón. */}
+          <path d="M32 13 L23 9 L22 25 L30 38 Z" fill={solapa} stroke={stroke} />
+          <path d="M32 13 L41 9 L42 25 L34 38 Z" fill={solapa} stroke={stroke} />
+          {/* línea de cierre del delantero + botón a la altura de la
+              cintura, donde abrocha un saco real (nunca más abajo). */}
+          <line x1="32" y1="38" x2="32" y2="58" stroke={stroke} />
+          <circle cx="32" cy="40" r="1.2" fill={solapa} stroke={stroke} strokeWidth={0.5} />
         </>
       );
       break;
