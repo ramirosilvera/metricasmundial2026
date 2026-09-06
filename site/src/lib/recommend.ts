@@ -3075,6 +3075,55 @@ export interface SugerenciaVariedad {
   sugerida: PresetPrenda & { hsl: HSL };
 }
 
+/** true si el usuario YA tiene en su placard una prenda equivalente a este
+ *  preset del catálogo -- bug real reportado por el usuario sobre la tarjeta
+ *  de compra prioritaria en Estadísticas: "me recomienda zapatos de vestir
+ *  marrones pero ya tengo". Reproducido contra su placard real (vía
+ *  Supabase): tiene tres pares de zapatos de vestir de cuero (dos marrones
+ *  #5C3A21 y uno negro #1C1210) y el motor le ofrecía comprar exactamente
+ *  ese mismo zapato del catálogo.
+ *
+ *  La causa era que NINGUNA de las capas de sugerencia miraba el placard
+ *  antes de elegir del catálogo: `mejorCandidatoDelCatalogo` filtra por
+ *  categoría, estilo y color-que-no-tenés-en-ese-registro, pero si todos
+ *  los candidatos resultan ser prendas que el usuario ya posee, igual
+ *  devolvía el primero. Un asesor de imagen nunca recomienda comprar algo
+ *  que ya está en el placard: si no hay nada honesto para sumar, no se
+ *  sugiere nada.
+ *
+ *  Equivalencia por CATEGORÍA + NOMBRE DE COLOR (no hex exacto: dos marrones
+ *  apenas distintos son, para el que se viste, el mismo zapato) + los datos
+ *  que de verdad separan dos prendas del mismo color:
+ *   - CORTE, en calzado: un mocasín marrón y un zapato de vestir marrón con
+ *     cordones son prendas distintas, y sugerir el segundo teniendo el
+ *     primero sí es legítimo.
+ *   - ESTACIÓN, cuando el preset la declara: un sweater beige de invierno no
+ *     es el sweater beige de entretiempo que ya tenés -- es justo la prenda
+ *     que pide la capa de abrigo (ver esAbrigoDeClima, que exige la estación
+ *     cargada). Sin esta salvedad, el filtro silenciaba una sugerencia
+ *     correcta y necesaria.
+ *   - TEXTURA, solo cuando las DOS la declaran: un pantalón de vestir de lana
+ *     y uno de poliéster del mismo beige son prendas distintas. Cuando
+ *     alguna de las dos no tiene textura cargada el criterio no se aplica --
+ *     media app carga prendas sin ese dato, y exigirlo reintroduciría el bug
+ *     original (el placard real del usuario tiene zapatillas con textura
+ *     nula, aunque sus zapatos de cuero sí la declaran).
+ *
+ *  Deliberadamente NO mira `estilo`: la pregunta es "¿ya tenés esta prenda?",
+ *  no "¿la tageaste para este registro?" -- que es un problema distinto, ver
+ *  el hallazgo de tageo en el informe de esta ronda. */
+function yaEstaEnElPlacard(preset: PresetPrenda & { hsl: HSL }, placard: Prenda[]): boolean {
+  const colorPreset = nombreColor(preset.hsl.h, preset.hsl.s, preset.hsl.l);
+  return placard.some((p) => {
+    if (p.categoria !== preset.categoria) return false;
+    if (nombreColor(p.color_h, p.color_s, p.color_l) !== colorPreset) return false;
+    if (preset.estacion && p.estacion !== preset.estacion) return false;
+    if (preset.textura && p.textura && p.textura !== preset.textura) return false;
+    if (p.categoria === "calzado") return p.corte_calzado === (preset.corteCalzado ?? "zapatilla_urbana");
+    return true;
+  });
+}
+
 // Colores neutros, en orden de prioridad para tapar un hueco de variedad --
 // van primero porque son los que más combinaciones habilitan (un básico
 // blanco/negro/gris combina con más cosas que un color puntual), mismo
@@ -3172,7 +3221,13 @@ function mejorCandidatoDelCatalogo(
       (preset) =>
         preset.categoria === categoria &&
         estilosDe(presetAPrendaSintetica(preset)).includes(estilo) &&
-        (!soloEstacion || preset.estacion === soloEstacion),
+        (!soloEstacion || preset.estacion === soloEstacion) &&
+        // nunca ofrecer comprar algo que el usuario ya tiene -- ver
+        // yaEstaEnElPlacard (bug real reportado sobre la tarjeta de compra
+        // prioritaria). Si esto deja la lista vacía, la capa que llamó
+        // devuelve null y simplemente no se sugiere nada: mejor callar que
+        // recomendar un duplicado.
+        !yaEstaEnElPlacard(preset, placard),
     )
     .map((preset) => {
       const sintetica = presetAPrendaSintetica(preset);
@@ -3307,6 +3362,23 @@ function mejorAnclaDelCatalogo(
       (soloPantalon ? preset.categoria === "pantalon" : CATEGORIAS_PIERNAS.includes(preset.categoria)) &&
       estilosDe(presetAPrendaSintetica(preset)).includes(estilo),
   );
+  // A propósito SIN el filtro `yaEstaEnElPlacard` que sí aplica
+  // mejorCandidatoDelCatalogo -- asimetría deliberada, encontrada al
+  // aplicarlo acá también y ver fallar un test bien fundado: un usuario con
+  // un pantalón NEGRO casual y ningún pantalón formal dejaba de recibir la
+  // sugerencia del pantalón de vestir negro, la única prenda que le
+  // permitiría armar un look formal. Un pantalón de vestir y un chino del
+  // mismo color son prendas distintas, y "pantalon + color" es demasiado
+  // grueso para decidir equivalencia cuando la textura no está cargada
+  // (media app la deja nula).
+  //
+  // La diferencia real entre las dos capas: esta corre SOLO cuando el
+  // registro no tiene NINGUNA prenda de piernas (hueco estructural -- sin
+  // ancla no hay un solo outfit posible), y sugerenciaDeAncla ya devolvió
+  // null si el usuario sí tiene una, así que acá es imposible duplicar algo
+  // que cumpla esa función. mejorCandidatoDelCatalogo, en cambio, alimenta
+  // las capas de VARIEDAD ("ya tenés uno, sumá otro"), donde ofrecer un
+  // duplicado es exactamente el bug reportado.
   if (candidatos.length === 0) return undefined;
 
   if (torsosPropios.length === 0) {

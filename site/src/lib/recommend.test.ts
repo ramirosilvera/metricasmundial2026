@@ -30,6 +30,7 @@ import {
   sugerenciaDeAncla,
   sugerenciaDeAnclaInvernal,
   sugerenciaDeSacoDeVerano,
+  sugerenciaDeCalzado,
   sugerenciaDeVariedad,
   tanda,
   tecnicaRescate,
@@ -3168,6 +3169,52 @@ describe("sugerenciaDeVariedad", () => {
   it("sin pantalón de ese estilo en el placard, no hay ancla -> null", () => {
     const remeraSola = mkPrendaEstilo("remera", "#1A1A1A", 0, 0, 10, "deportivo");
     expect(sugerenciaDeVariedad("deportivo", [remeraSola], catalogoDeportivo)).toBeNull();
+  });
+
+  // Bug real reportado por el usuario sobre la tarjeta de compra prioritaria
+  // en Estadísticas ("me recomienda zapatos de vestir marrones pero ya
+  // tengo"), reproducido contra su placard real vía Supabase: tiene tres
+  // pares de zapatos de vestir de cuero, pero solo UNO tageado "formal" (los
+  // otros dicen "oficina"), así que la capa de variedad de calzado veía "un
+  // solo par" y ofrecía comprar del catálogo justo el zapato que ya está en
+  // el placard. Ver yaEstaEnElPlacard en recommend.ts.
+  it("nunca sugiere comprar una prenda que el usuario YA tiene, aunque la tenga tageada para otro estilo", () => {
+    const catalogoVestir: (PresetPrenda & { hsl: HSL })[] = [
+      { id: "zapatos-negro", nombre: "Zapatos de vestir negros", categoria: "calzado", colorHex: "#1C1210", textura: "cuero_liso", estilo: "formal", hsl: { h: 10, s: 27, l: 9 }, corteCalzado: "zapato_vestir" },
+      { id: "zapatos-marron", nombre: "Zapatos de vestir marrones", categoria: "calzado", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "formal", hsl: { h: 25, s: 47, l: 25 }, corteCalzado: "zapato_vestir" },
+    ];
+    const pantalon = mkPrendaEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const zapatoMarron = mkPrendaEstilo("calzado", "#5C3A21", 25, 47, 25, "formal");
+    zapatoMarron.corte_calzado = "zapato_vestir";
+    zapatoMarron.textura = "cuero_liso";
+    // el negro existe en el placard pero tageado "oficina", no "formal" --
+    // el caso exacto del usuario.
+    const zapatoNegroOficina = mkPrendaEstilo("calzado", "#1C1210", 10, 27, 9, "oficina");
+    zapatoNegroOficina.corte_calzado = "zapato_vestir";
+    zapatoNegroOficina.textura = "cuero_liso";
+
+    const r = sugerenciaDeCalzado("formal", [pantalon, zapatoMarron, zapatoNegroOficina], catalogoVestir);
+    // los dos únicos candidatos del catálogo ya están en el placard: no hay
+    // nada honesto que ofrecer, así que no se sugiere nada.
+    expect(r).toBeNull();
+  });
+
+  it("un corte distinto del mismo color SÍ es una prenda nueva -- no lo confunde con lo que ya tiene", () => {
+    const catalogoConMocasin: (PresetPrenda & { hsl: HSL })[] = [
+      { id: "mocasin-marron", nombre: "Mocasines marrones", categoria: "calzado", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "formal", hsl: { h: 25, s: 47, l: 25 }, corteCalzado: "mocasin" },
+    ];
+    // ancla BEIGE, no negra: con un pantalón de vestir negro el motor
+    // rechaza (bien) cualquier cuero marrón por la regla de coordinación del
+    // cuero -- ver esDescoordinacionDeCuero. Acá se quiere probar el filtro
+    // de "ya lo tengo", no esa regla.
+    const pantalon = mkPrendaEstilo("pantalon", "#D8C7A1", 41, 41, 74, "formal");
+    const zapatoMarron = mkPrendaEstilo("calzado", "#5C3A21", 25, 47, 25, "formal");
+    zapatoMarron.corte_calzado = "zapato_vestir";
+    zapatoMarron.textura = "cuero_liso";
+
+    const r = sugerenciaDeCalzado("formal", [pantalon, zapatoMarron], catalogoConMocasin);
+    expect(r).not.toBeNull();
+    expect(r!.sugerida.id).toBe("mocasin-marron");
   });
 
   it("0 prendas de torso en ese estilo -> sugiere la primera categoría de torso que combine, mensaje de 'ninguna'", () => {
