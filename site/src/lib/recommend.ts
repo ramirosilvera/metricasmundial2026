@@ -1,4 +1,4 @@
-import { CATEGORIA_LABEL, type Categoria, type CorteCalzado, type Estacion, type Estilo, type HSL, type NivelCompatibilidad, type Prenda } from "./types";
+import { CATEGORIA_LABEL, type Categoria, type CorteCalzado, type Estacion, type Estilo, type HSL, type NivelCompatibilidad, type Prenda, type Textura } from "./types";
 import { CATALOGO_CON_HSL, presetAPrendaSintetica, type PresetPrenda } from "./catalogo";
 import { nombreColor } from "./color";
 
@@ -334,7 +334,15 @@ export function scoreColor(base: HSL, candidato: HSL): ScoreColor {
 // que tiene el catálogo. Ambas van a "texturado": el tejido cruzado del
 // denim y el acolchado de la campera de pluma se notan a simple vista,
 // igual que la lana o la pana.
-const FAMILIA_TEXTURA: Record<string, "liso" | "texturado"> = {
+// Record<Textura, ...> y no Record<string, ...> (como estaba): con `string`
+// como clave, olvidarse una textura nueva compilaba sin una sola queja --
+// exactamente el bug que ya pasó CUATRO veces (denim, acolchado,
+// impermeable, tricot; ver los comentarios de acá arriba y abajo), cada una
+// dejando la técnica de rescate "separar por textura" muda para esas
+// prendas hasta que alguien lo notaba a ojo. Tipado contra el enum, el
+// compilador lo exige: agregar un valor a Textura sin mapearlo acá ya no
+// compila.
+const FAMILIA_TEXTURA: Record<Textura, "liso" | "texturado"> = {
   algodon: "liso",
   seda: "liso",
   cuero_liso: "liso",
@@ -363,6 +371,16 @@ const FAMILIA_TEXTURA: Record<string, "liso" | "texturado"> = {
   impermeable: "liso",
   tricot: "liso",
   lana: "texturado",
+  // gabardina -- sarga empinada de trama cerrada: la diagonal se ve, igual
+  // que en el denim (también "texturado" acá abajo), aunque sea mate y más
+  // fina. Agregada junto con el valor nuevo de Textura (pedido explícito
+  // del usuario: separar el pantalón de oficina de gabardina del formal de
+  // lana de traje) -- se suma acá en la misma ronda a propósito, para no
+  // repetir el olvido histórico que documenta el comentario de arriba
+  // (denim/acolchado/impermeable/tricot quedaron fuera del mapa por
+  // rondas enteras y la técnica de rescate "separar por textura" no se
+  // ofrecía para ninguna).
+  gabardina: "texturado",
   pana: "texturado",
   corderoy: "texturado",
   tejido_grueso: "texturado",

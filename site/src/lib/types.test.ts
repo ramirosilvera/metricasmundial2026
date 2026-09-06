@@ -53,6 +53,21 @@ describe("descripcionPrenda", () => {
     expect(descripcionPrenda(mkPrenda("bermuda", { textura: "lana" }))).toBe("Bermuda de vestir");
   });
 
+  // Pedido explícito del usuario, revisado como sastre e ingeniero textil:
+  // "los pantalones de vestir que tengo, negro y marrón, que son de
+  // oficina y clásicos, son de gabardina... los formales son otra tela más
+  // suave tipo de traje". El de gabardina (oficina) y el de lana (traje)
+  // son dos prendas distintas de verdad -- misma silueta con raya
+  // planchada, otra fibra y otro registro -- así que la descripción las
+  // nombra por lo que son en la calle, sin mezclarlas.
+  it("pantalón/bermuda de gabardina se describen por su tela (el de oficina), distinto del de lana de traje", () => {
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "gabardina" }))).toBe("Pantalón de gabardina");
+    expect(descripcionPrenda(mkPrenda("bermuda", { textura: "gabardina" }))).toBe("Bermuda de gabardina");
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "lana" }))).not.toBe(
+      descripcionPrenda(mkPrenda("pantalon", { textura: "gabardina" })),
+    );
+  });
+
   it("pantalón de algodón clásico es Pantalón chino, casual es Jogger", () => {
     expect(descripcionPrenda(mkPrenda("pantalon", { textura: "algodon", estilo: "clasico" }))).toBe("Pantalón chino");
     expect(descripcionPrenda(mkPrenda("pantalon", { textura: "algodon", estilo: "casual" }))).toBe("Jogger");

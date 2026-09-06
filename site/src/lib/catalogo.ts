@@ -352,15 +352,57 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // saco o no) -- ver el chequeo nuevo en outfitSirveParaEstilo
   // (recommend.ts), que exige saco para "formal" y lo prohíbe para
   // "oficina".
+  // textura "lana" en los 3 -- son los pantalones de TRAJE: lana tropical/
+  // fresco, la tela que se corta junto con el saco. Los tres colores que
+  // quedan acá son exactamente los tres colores de traje reales (negro,
+  // gris y azul marino); el beige salió de este grupo en la ronda de
+  // gabardina de acá abajo, porque un pantalón de traje beige de lana no
+  // es un básico real -- el pantalón beige de vestir que existe de verdad
+  // es de gabardina (o un chino, que ya está más abajo).
   { id: "pantalon-vestir-negro", nombre: "Pantalón de vestir negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
   { id: "pantalon-vestir-gris", nombre: "Pantalón de vestir gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
   { id: "pantalon-vestir-azul", nombre: "Pantalón de vestir azul marino", categoria: "pantalon", colorHex: "#1F2A44", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
-  // distinto de pantalon-beige de acá abajo (el chino, algodón/clasico) --
-  // mismo beige del resto del catálogo, pero de vestir: lana/formal, igual
-  // criterio que negro/gris/azul marino de arriba. No es una entrada
-  // duplicada -- un chino y un pantalón de vestir son prendas distintas
-  // aunque compartan color.
-  { id: "pantalon-vestir-beige", nombre: "Pantalón de vestir beige", categoria: "pantalon", colorHex: "#D8C7A1", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
+
+  // --- Pantalón de gabardina (el de OFICINA) -- pedido explícito del
+  // usuario, revisado como sastre e ingeniero textil: "los pantalones de
+  // vestir que tengo, negro y marrón, que son de oficina y clásicos, son
+  // de gabardina... en el catálogo podés distinguir los de oficina, que
+  // son típicamente de gabardina, y los formales, que son otra tela más
+  // suave tipo de traje". Tenía razón y era un hueco real: hasta esta
+  // ronda TODO pantalón de vestir del catálogo era "lana", así que la
+  // prenda que más se usa para ir a trabajar no existía como tal.
+  //
+  // Por qué son entradas propias y no un color más de los de arriba: es
+  // otra tela de verdad (sarga empinada ~63°, trama cerrada, mate y firme
+  // contra la caída suave y difusa de la lana de traje -- ver el enum
+  // Textura en types.ts), otro registro real (el de traje se corta con el
+  // saco; el de gabardina se usa solo, con camisa o sweater) y hasta se
+  // dibujan distinto (misma raya planchada, otra trama -- ver
+  // esPantalonDeVestir y PatronTextura en PrendaIcon.tsx). Mismo criterio
+  // que ya separó el chino de algodón del pantalón de vestir de lana.
+  //
+  // estilo "oficina" + secundario "clasico", NO "formal": un pantalón de
+  // gabardina no es un pantalón de traje -- va perfecto a la oficina con
+  // camisa o sweater y aguanta un blazer, pero no es la prenda que define
+  // un traje (ver outfitSirveParaEstilo en recommend.ts, que exige saco
+  // para "formal"). Los de lana de arriba conservan "formal" + "oficina"
+  // a propósito: un pantalón de vestir de lana suelto SÍ se usa en la
+  // oficina sin saco, es de uso y costumbre común.
+  //
+  // Marrón -- color nuevo en la categoría (el catálogo no tenía NINGÚN
+  // pantalón de vestir marrón hasta ahora, y es uno de los dos que el
+  // usuario tiene en el placard). Reusa el mismo marrón café del resto del
+  // catálogo (#6F4E37, ya en zapatillas-marrones y pantalon-pana-marron)
+  // por la misma consistencia de paleta que documenta el resto del archivo.
+  { id: "pantalon-gabardina-negro", nombre: "Pantalón de gabardina negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-gabardina-marron", nombre: "Pantalón de gabardina marrón", categoria: "pantalon", colorHex: "#6F4E37", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-gabardina-gris", nombre: "Pantalón de gabardina gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
+  // el que antes era "pantalon-vestir-beige" (lana/formal) -- ver el
+  // comentario de los de lana de arriba: el pantalón de vestir beige real
+  // es de gabardina, no de lana de traje. Sigue siendo distinto de
+  // pantalon-beige de acá abajo (el chino, algodón/clasico): mismo beige
+  // del resto del catálogo, otra tela y otro registro.
+  { id: "pantalon-gabardina-beige", nombre: "Pantalón de gabardina beige", categoria: "pantalon", colorHex: "#D8C7A1", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
   { id: "pantalon-beige", nombre: "Pantalón chino beige", categoria: "pantalon", colorHex: "#D8C7A1", textura: "algodon", estilo: "clasico", ocasion: "laburo" },
 
   // --- Pantalón de lino (clásico, verano) -- ampliación del catálogo,
@@ -1030,7 +1072,7 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // forro pesado, tela suelta que transpira -- verificado por búsqueda
   // web: es la prenda estándar para "traje de verano" (bodas/eventos
   // formales de temporada cálida). Beige, el color de lino más clásico y
-  // el mismo hex que ya usa el resto del catálogo (pantalon-vestir-beige y
+  // el mismo hex que ya usa el resto del catálogo (pantalon-gabardina-beige y
   // compañía) -- consistencia de paleta cross-categoría. calce "regular"
   // (no "ajustado" como el de lana): un saco de lino real es más suelto,
   // parte de por qué transpira mejor.

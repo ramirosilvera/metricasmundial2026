@@ -156,6 +156,59 @@ describe("catálogo -- saco (categoría nueva, pedido explícito del usuario: 'u
   });
 });
 
+// Pedido explícito del usuario, revisado como sastre e ingeniero textil:
+// "los pantalones de vestir que tengo en mi placard, negro y marrón, que
+// son de oficina y clásicos, son de gabardina... quizás en el catálogo
+// también podés distinguir los pantalones de vestir de oficina, que son
+// típicamente de gabardina, y los formales, que son otra tela más suave
+// tipo de traje". Hueco real: hasta esta ronda TODO pantalón de vestir del
+// catálogo era "lana", así que la prenda que más se usa para ir a trabajar
+// no existía como tal, y encima no había NINGÚN pantalón de vestir marrón.
+describe("catálogo -- pantalón de vestir: gabardina (oficina) vs. lana de traje (formal)", () => {
+  const pantalones = CATALOGO_PRENDAS.filter((p) => p.categoria === "pantalon");
+  const deLana = pantalones.filter((p) => p.textura === "lana");
+  const deGabardina = pantalones.filter((p) => p.textura === "gabardina");
+
+  it("existen las dos telas de pantalón de vestir, no una sola", () => {
+    expect(deLana.length).toBeGreaterThan(0);
+    expect(deGabardina.length).toBeGreaterThan(0);
+  });
+
+  it("el de lana es el de TRAJE: formal (con oficina de secundario, se usa suelto sin saco)", () => {
+    for (const p of deLana) {
+      expect(p.estilo).toBe("formal");
+      expect(p.estilosSecundarios ?? []).toContain("oficina");
+    }
+  });
+
+  it("el de gabardina es el de OFICINA: nunca formal -- no es un pantalón de traje", () => {
+    for (const p of deGabardina) {
+      expect(p.estilo).toBe("oficina");
+      expect([p.estilo, ...(p.estilosSecundarios ?? [])]).not.toContain("formal");
+    }
+  });
+
+  it("los de lana cubren los tres colores de traje reales (negro, gris, azul marino)", () => {
+    const hex = deLana.map((p) => p.colorHex);
+    expect(hex).toContain("#1A1A1A");
+    expect(hex).toContain("#6E6E6E");
+    expect(hex).toContain("#1F2A44");
+  });
+
+  it("la gabardina cubre los dos colores que el usuario tiene de verdad (negro y marrón)", () => {
+    const hex = deGabardina.map((p) => p.colorHex);
+    expect(hex).toContain("#1A1A1A");
+    expect(hex).toContain("#6F4E37");
+  });
+
+  it("los dos llevan calce ajustado y ocasión laburo -- misma silueta de sastrería, lo que cambia es la tela", () => {
+    for (const p of [...deLana, ...deGabardina]) {
+      expect(p.calce).toBe("ajustado");
+      expect(p.ocasion).toBe("laburo");
+    }
+  });
+});
+
 describe("catálogo -- camisas a rayas (pedido explícito del usuario: 'blanca y celestes y de otros colores', inspirado en usos y costumbres/moda real de oficina)", () => {
   const camisasConPatron = CATALOGO_PRENDAS.filter((p) => p.categoria === "camisa" && p.patron && p.patron !== "liso");
 

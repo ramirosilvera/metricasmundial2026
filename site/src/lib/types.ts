@@ -26,7 +26,23 @@ export type Textura =
   | "poliester"
   | "viscosa"
   | "impermeable"
-  | "tricot";
+  | "tricot"
+  // Pedido explícito del usuario, revisado como sastre e ingeniero textil:
+  // "los pantalones de vestir que tengo, negro y marrón, que son de oficina
+  // y clásicos, son de gabardina... en el catálogo podés distinguir los
+  // pantalones de vestir de oficina que son típicamente de gabardina y los
+  // formales que son otra tela más suave tipo de traje". Es una distinción
+  // real de sastrería, no un matiz: la gabardina es un tejido de sarga
+  // MUY empinada (~63°, contra los ~45° del denim), de trama cerrada,
+  // mate y firme -- la tela del pantalón de oficina que se usa todos los
+  // días, aguanta uso y planchado y no se marca. La lana de traje
+  // (tropical/fresco) es la contraria: caída suave, superficie más
+  // difusa, es la que se corta junto con el saco. Misma silueta (los dos
+  // llevan la raya planchada al frente, ver esPantalonDeVestir en
+  // PrendaIcon.tsx), fibra y registro distintos -- por eso una textura
+  // propia y no "lana" para las dos, mismo criterio que ya separó
+  // impermeable de poliester (0024) y tricot de impermeable (0025).
+  | "gabardina";
 
 // "oficina" -- pedido explícito del usuario, revisado como asesor de
 // imagen/sastre: "formal y oficina se mezclan... formal es solamente el
@@ -245,6 +261,12 @@ export function descripcionPrenda(p: Prenda): string {
     const esPantalon = p.categoria === "pantalon";
     if (p.textura === "denim") return esPantalon ? "Jean" : "Bermuda de jean";
     if (p.textura === "lana") return esPantalon ? "Pantalón de vestir" : "Bermuda de vestir";
+    // gabardina -- ver el comentario largo en el enum Textura de arriba.
+    // El nombre real de la prenda en la calle es justamente "pantalón de
+    // gabardina" (el de oficina), distinto del "pantalón de vestir" de
+    // lana que se corta con el traje: son dos prendas que un sastre no
+    // confunde, así que la descripción tampoco las confunde.
+    if (p.textura === "gabardina") return esPantalon ? "Pantalón de gabardina" : "Bermuda de gabardina";
     if (p.textura === "poliester") {
       // pedido explícito del usuario, revisado como sastre/ingeniero
       // textil: "en el catálogo hay joggers, pero cuando le pongo que su

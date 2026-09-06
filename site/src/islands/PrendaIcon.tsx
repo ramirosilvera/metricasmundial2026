@@ -86,17 +86,23 @@ export function esJean(categoria: Categoria, textura: Textura | null | undefined
   return (categoria === "pantalon" || categoria === "bermuda") && textura === "denim";
 }
 
-/** Pantalón de vestir real (categoria="pantalon", textura="lana") --
- *  contraparte de sastrería del jean de arriba. La raya/pinza al frente
- *  planchada (crease) es el detalle real que define un pantalón de vestir
- *  -- nunca lleva pespunte visible como el jean (la tela de vestir se cose
- *  con costura oculta, no expuesta). "lana" alcanza solo: es la única
- *  textura real de pantalón de vestir en el catálogo hoy (ver
- *  pantalon-vestir-* en catalogo.ts) -- un chino de algodón (registro
- *  clásico/oficina pero tela informal) no lleva esta raya planchada real,
- *  se queda con la silueta genérica/default. */
+/** Pantalón de vestir real (categoria="pantalon", textura "lana" o
+ *  "gabardina") -- contraparte de sastrería del jean de arriba. La
+ *  raya/pinza al frente planchada (crease) es el detalle real que define un
+ *  pantalón de vestir -- nunca lleva pespunte visible como el jean (la tela
+ *  de vestir se cose con costura oculta, no expuesta).
+ *
+ *  Las DOS texturas comparten la raya a propósito: el pantalón de oficina
+ *  de gabardina y el formal de lana de traje son prendas distintas por
+ *  fibra y registro (ver el enum Textura en types.ts), pero de silueta
+ *  idéntica -- las dos se planchan con raya, es justamente lo que las hace
+ *  "de vestir". Lo que las diferencia visualmente acá es la TRAMA, no el
+ *  corte: la sarga empinada y mate de la gabardina contra el punto difuso
+ *  de la lana (ver PatronTextura más abajo). Un chino de algodón (registro
+ *  clásico/oficina pero tela informal) sigue afuera: no lleva raya
+ *  planchada real, se queda con la silueta genérica/default. */
 export function esPantalonDeVestir(categoria: Categoria, textura: Textura | null | undefined): boolean {
-  return categoria === "pantalon" && textura === "lana";
+  return categoria === "pantalon" && (textura === "lana" || textura === "gabardina");
 }
 
 /** Jogger/pantalón deportivo real (categoria="pantalon", calce="holgado",
@@ -136,7 +142,7 @@ export function esRemeraDeportiva(categoria: Categoria, textura: Textura | null 
 // copias, agregar una textura nueva (como "viscosa") corría el riesgo real
 // de actualizar una sola y desincronizar cómo se ve la MISMA prenda en el
 // catálogo/placard contra cómo se ve en "Vestite hoy".
-export const TEXTURA_PATRON: Textura[] = ["denim", "pana", "corderoy", "tejido_grueso", "frisado", "lana", "algodon", "lino", "acolchado"];
+export const TEXTURA_PATRON: Textura[] = ["denim", "pana", "corderoy", "tejido_grueso", "frisado", "lana", "gabardina", "algodon", "lino", "acolchado"];
 // poliéster (ropa deportiva técnica) suma el mismo brillo diagonal que
 // seda/cuero_liso -- es tela lisa, sin trama visible, con un leve brillo
 // sintético real (más notorio que en algodón/lino), no un patrón tejido.
@@ -186,6 +192,20 @@ export function PatronTextura({ id, textura, tono }: { id: string; textura: Text
       return (
         <pattern id={id} width="4" height="4" patternUnits="userSpaceOnUse">
           <path d="M0 4 L2 0 L4 4" fill="none" stroke={tono} strokeWidth="0.5" />
+        </pattern>
+      );
+    case "gabardina":
+      // sarga empinada -- la seña real que define a la gabardina y la
+      // separa del denim de acá arriba: el mismo tipo de diagonal, pero
+      // trazada a ~63° en vez de ~45° (el ángulo de sarga steep-twill que
+      // la caracteriza de verdad) y con las líneas más juntas y finas,
+      // porque es una trama mucho más cerrada y mate que el denim. Al
+      // lado del punto difuso de la lana de traje (case de acá arriba) se
+      // lee como lo que es: una tela lisa y firme con nervadura, no un
+      // tejido blando.
+      return (
+        <pattern id={id} width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(63)">
+          <line x1="0" y1="0" x2="0" y2="2" stroke={tono} strokeWidth="0.4" />
         </pattern>
       );
     case "frisado":
