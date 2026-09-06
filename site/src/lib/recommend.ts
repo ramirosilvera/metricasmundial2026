@@ -99,7 +99,20 @@ const CROMA_ACENTO = 40;
 
 export interface ScoreColor {
   nivel: NivelCompatibilidad;
-  tag?: "tono_sobre_tono" | "combinacion_audaz" | "contraste_marcado";
+  /** "prolijo" -- auditoría de Consejo de esta ronda, al anclar el puntaje
+   *  del outfit en su peor par (ver puntuarOutfit): "muy_bueno" venía
+   *  mezclando dos cosas de gravedad muy distinta bajo un mismo nivel:
+   *  (a) un DEFECTO real que un sastre señalaría y que se arregla cambiando
+   *      una prenda -- un calzado más informal que el pantalón, dos prendas
+   *      holgadas a la vez, dos complementarios intensos gritando;
+   *  (b) un par simplemente CORRECTO, sin nada para arreglar ni nada
+   *      notable -- el catch-all de la regla 6 ("contraste moderado,
+   *      combinación prolija" / "matices relacionados").
+   *  Mientras el puntaje era un promedio la diferencia se disimulaba; con
+   *  la nota anclada al peor par, tratar (b) como (a) hundía a 3 estrellas
+   *  outfits donde no hay literalmente nada que cambiar. Este tag marca (b)
+   *  para que puntuarOutfit no lo cuente como defecto -- ver su uso ahí. */
+  tag?: "tono_sobre_tono" | "combinacion_audaz" | "contraste_marcado" | "prolijo";
   explicacion: string;
 }
 
@@ -297,9 +310,15 @@ export function scoreColor(base: HSL, candidato: HSL): ScoreColor {
     };
   }
 
-  // 6. Resto.
+  // 6. Resto -- el catch-all. Tageado "prolijo" (ver ScoreColor): es la
+  // única rama de "muy_bueno" que NO señala nada para arreglar, solo dice
+  // "esto está bien, sin nada destacable". No cuenta como defecto al
+  // puntuar el outfit completo, a diferencia de las degradaciones por
+  // registro/volumen de recomendar() y de la combinación audaz (donde sí
+  // hay algo concreto que un asesor de imagen te haría revisar).
   return {
     nivel: "muy_bueno",
+    tag: "prolijo",
     explicacion:
       hd < 0.5
         ? "Matices relacionados, buen equilibrio general."
@@ -1328,22 +1347,26 @@ function nivelOrden(nivel: NivelCompatibilidad): number {
 }
 
 export interface PuntajeOutfit {
-  /** 1-10. Promedio de PUNTOS_POR_NIVEL sobre TODOS los pares de prendas
-   *  del outfit (no solo contra el ancla) -- el mismo conjunto de
-   *  comparaciones que ya arma/valida armarOutfitsSugeridos (torso-ancla,
-   *  calzado-ancla, accesorio-ancla, calzado-torso, accesorio-torso,
-   *  accesorio-calzado), reusado acá en vez de inventar una escala aparte.
-   *  10 es exclusivo de "todos los pares excelente Y sin ningún ajuste
-   *  pendiente" -- ni el redondeo sube a 10 con un par por debajo (aunque
-   *  el promedio dé 9.5+), ni "todos los pares excelente" alcanza si el
-   *  outfit tiene un acento de color aislado o piernas/torso casi
-   *  idénticos (ver `tieneAjustePendiente` en el cuerpo de la función:
-   *  Consejo, auditoría de exigencia -- pedido explícito del usuario, "que
-   *  sea realmente exigente... que cuando haga una combinación sea buena y
-   *  sea indiscutible"). 9 es exactamente eso: matemáticamente impecable
-   *  en color de a pares, pero con un detalle de refinamiento real que la
-   *  propia `explicacion` nombra -- ya no queda escondido detrás de un
-   *  "10/10 sin nada que ajustar" que se contradice a sí mismo. */
+  /** 1-10, calculado sobre TODOS los pares de prendas del outfit (no solo
+   *  contra el ancla) -- el mismo conjunto de comparaciones que ya arma/
+   *  valida armarOutfitsSugeridos (torso-ancla, calzado-ancla,
+   *  accesorio-ancla, calzado-torso, accesorio-torso, accesorio-calzado),
+   *  reusado acá en vez de inventar una escala aparte. NO es un promedio
+   *  (lo fue hasta la revisión de Consejo que lo eliminó: promediar diluía
+   *  el mismo defecto según cuántas prendas tuviera el outfit, ver el
+   *  comentario largo en el cuerpo de puntuarOutfit). Cada valor significa
+   *  una sola cosa, verificable:
+   *   - 10: ningún par por debajo de excelente y ningún refinamiento
+   *     pendiente. Es el único "indiscutible".
+   *   - 9: todos los pares excelente, pero con un refinamiento real que la
+   *     propia `explicacion` nombra (acento de color aislado, o piernas y
+   *     torso casi del mismo tono).
+   *   - 8: sin defectos que arreglar, pero sin nada destacable -- algún par
+   *     apenas "prolijo" (ver ScoreColor.tag).
+   *   - 6 / 5 / 4: hay 1, 2 o 3+ PRENDAS para cambiar por un defecto real
+   *     (registro, volumen, color audaz sin contraste).
+   *   - 3 / 2 / 1: ídem, pero con un choque real de por medio (cuero
+   *     descoordinado, corbata sin cuello, deportivo con prenda de vestir). */
   puntaje: number;
   /** Motivo ejecutivo, 1-2 oraciones: por qué no es (o si es) un 10. No
    *  repite el registro (Formal/Casual/...) -- eso ya lo muestra
@@ -1358,21 +1381,82 @@ export interface PuntajeOutfit {
   contrasteMarcado: boolean;
 }
 
-// muy_bueno bajó de 7 a 6 -- pedido explícito del usuario, revisado con
-// multiples roles (asesor de imagen, sastre, motor/QA): "veo una
-// puntuación de 9/10 que para mí debería ser menos... subí un poco la
-// exigencia". El problema real no era el nivel en sí (muy_bueno sigue
-// siendo "funciona, con un detalle") sino que, en un outfit de varias
-// prendas (varios pares), UN SOLO par en muy_bueno se diluía en el
-// promedio del resto en excelente y terminaba redondeando a 9 -- un
-// outfit con un defecto real leído como "casi perfecto". Bajar el punto
-// por nivel (no solo el tope de más abajo) hace que ESE mismo defecto
-// pese más en el promedio, sea cual sea la cantidad de prendas -- más
-// prendas ya no diluye un defecto, lo sigue penalizando en proporción.
-// con_cuidado se deja en 3: ya se lee como "mal" con claridad, y en la
-// práctica casi nunca llega a puntuarOutfit (armarOutfitsSugeridos ya
-// filtra esos pares antes de llegar acá).
+// Techo de puntaje de un outfit según su PEOR par (ya no un valor a
+// promediar -- ver el comentario largo de puntuarOutfit sobre por qué se
+// abandonó el promedio). "excelente" solo se alcanza con TODOS los pares
+// excelente, así que su 10 se usa por la vía de `todosExcelentes`; los
+// otros dos son la nota de partida cuando hay un defecto de ese nivel:
+// 6 si lo peor que hay es un "muy_bueno" (un detalle, se nota pero
+// funciona), 3 si hay un choque real ("con_cuidado").
 const PUNTOS_POR_NIVEL: Record<NivelCompatibilidad, number> = { excelente: 10, muy_bueno: 6, con_cuidado: 3 };
+
+// Piso por nivel de defecto -- hasta dónde puede bajar la nota acumulando
+// prendas a cambiar, sin invadir el territorio del nivel de abajo: un
+// outfit cuyo peor problema es un "muy_bueno" nunca baja de 4 (si bajara a
+// 3 se leería igual que un choque real), y uno con choques reales no baja
+// de 1 (la escala arranca en 1, no en 0).
+const PISO_POR_NIVEL: Record<"muy_bueno" | "con_cuidado", number> = { muy_bueno: 4, con_cuidado: 1 };
+
+// El escalón "no hay nada que arreglar, pero tampoco nada que destacar":
+// ningún par excelente que lo lleve a 10, ningún defecto real que lo baje a
+// 6 -- solo pares "prolijos" (ver ScoreColor.tag). Es deliberadamente el
+// único valor entre el territorio de lo impecable (9-10) y el de lo que
+// tiene algo para cambiar (<= 6): un outfit correcto y sin gracia no
+// merece estrellas llenas, pero tampoco se le puede señalar un error.
+const PUNTAJE_SIN_DEFECTOS = 8;
+
+// Tope de prendas a cambiar que se penaliza (ver prendasACambiar): a
+// partir de 3 prendas para tocar, el outfit ya está en su piso -- no hace
+// falta calcular el número exacto, y acotarlo mantiene la búsqueda del
+// mínimo (fuerza bruta creciente) trivial incluso con outfits grandes.
+const MAX_PRENDAS_A_CAMBIAR = 3;
+
+/** true si cambiar las prendas de `seleccion` alcanza para que no quede
+ *  ningún par defectuoso (todo par tiene al menos una punta adentro). */
+function cubreTodos(seleccion: Set<string>, pares: Array<{ a: Prenda; b: Prenda }>): boolean {
+  return pares.every((p) => seleccion.has(p.a.id) || seleccion.has(p.b.id));
+}
+
+function existeSeleccionDeTamaño(
+  ids: string[],
+  pares: Array<{ a: Prenda; b: Prenda }>,
+  k: number,
+  desde = 0,
+  actual: string[] = [],
+): boolean {
+  if (actual.length === k) return cubreTodos(new Set(actual), pares);
+  for (let i = desde; i < ids.length; i++) {
+    actual.push(ids[i]);
+    const ok = existeSeleccionDeTamaño(ids, pares, k, i + 1, actual);
+    actual.pop();
+    if (ok) return true;
+  }
+  return false;
+}
+
+/** Cuántas prendas hay que cambiar, como mínimo, para que el outfit deje de
+ *  tener pares defectuosos -- auditoría de Consejo (rol: sastre), el
+ *  reemplazo del "cuántos pares están mal" que usaba el promedio anterior.
+ *
+ *  La distinción es real y la hace cualquier sastre mirando un conjunto: un
+ *  calzado que desentona con el pantalón, con el torso Y con el cinturón
+ *  genera TRES pares defectuosos, pero es UN SOLO problema -- se cambia el
+ *  calzado y listo. Contar pares castigaba ese caso el triple que un
+ *  defecto que toca una sola prenda, y además castigaba más a los outfits
+ *  con más prendas (más pares por el mismo error). Contar PRENDAS A CAMBIAR
+ *  mide lo que de verdad le cuesta al usuario arreglarlo.
+ *
+ *  Formalmente es el mínimo "vertex cover" del grafo de pares defectuosos,
+ *  buscado por tamaño creciente (1, 2, ...) y cortado en `tope` -- con
+ *  outfits de 4-5 prendas son unas decenas de comprobaciones. */
+function prendasACambiar(pares: Array<{ a: Prenda; b: Prenda }>, tope = MAX_PRENDAS_A_CAMBIAR): number {
+  if (pares.length === 0) return 0;
+  const ids = [...new Set(pares.flatMap((p) => [p.a.id, p.b.id]))];
+  for (let k = 1; k < tope; k++) {
+    if (existeSeleccionDeTamaño(ids, pares, k)) return k;
+  }
+  return tope;
+}
 
 /** Cuántos colores "protagonistas" tiene el outfit -- pedido explícito del
  *  usuario: "reglas universales que toda combinación debe seguir... por
@@ -1571,35 +1655,44 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
     return { puntaje: 10, explicacion: "Una sola prenda: no hay con qué chocar.", contrasteMarcado: false };
   }
 
-  // Auditoría de Consejo (lógica/motor, verificado por ejecución sobre el
-  // catálogo real -- ver el hallazgo completo en el historial de la
-  // sesión): con 4 prendas (6 pares) un solo par muy_bueno entre cinco
-  // excelente promedia 9.5 ((5*10+7)/6) y Math.round sube a 10 -- un
-  // outfit de 4 prendas con un salto de registro real (ej. pantalón de
-  // vestir + zapatillas urbanas) mostraba el badge "10/10" al lado de una
-  // explicación citando el defecto, una contradicción directa (confirmado
-  // con el catálogo real: 180 de los outfits que arma armarOutfitsSugeridos
-  // caían en este caso). `todosExcelentes` se calcula ANTES que el puntaje
-  // y lo topea -- un 10/10 pasa a significar, siempre, "ningún par por
-  // debajo de excelente", nunca "el redondeo dio justo".
+  // El PROMEDIO de pares quedó eliminado en esta ronda -- auditoría de
+  // Consejo con medición sobre el catálogo real, y es el hallazgo más
+  // grande del sistema de puntuación hasta acá. La versión anterior
+  // promediaba PUNTOS_POR_NIVEL sobre todos los pares y topeaba el
+  // resultado en 8 cuando algún par no era excelente; el comentario de
+  // entonces decía haber resuelto así que "más prendas = más pares = el
+  // mismo defecto se diluye más en el promedio". No lo resolvió: el tope
+  // solo aplastaba el techo, la dilución seguía intacta debajo. Medido por
+  // ejecución con el catálogo real, EL MISMO defecto (pantalón de vestir +
+  // zapatillas urbanas, un salto de registro):
+  //    2 prendas (1 par):  6/10
+  //    3 prendas (3 pares): 8/10
+  //    4 prendas (6 pares): 8/10
+  // Agregar una camisa que no tiene NADA que ver con el defecto subía la
+  // nota dos puntos, porque sumaba pares excelentes que promediaban hacia
+  // arriba. Exactamente al revés de lo que ve un sastre: un conjunto vale
+  // lo que su eslabón más flojo, no el promedio de sus aciertos.
   //
-  // Tope bajado de 9 a 8 -- segunda vuelta de auditoría, pedido explícito
-  // del usuario: "veo una puntuación de 9/10 que para mí debería ser
-  // menos... subí un poco la exigencia". El caso de arriba (5 excelente +
-  // 1 muy_bueno) seguía redondeando a 9 con el tope viejo -- técnicamente
-  // ya no era un 10 falso, pero un outfit con un defecto de registro real
-  // (no una diferencia de gustos) leído como "casi perfecto" (9/10)
-  // tampoco describe bien la realidad, sobre todo porque más prendas =
-  // más pares = el mismo defecto se diluye más en el promedio, así que un
-  // outfit rico "esconde" mejor su propio defecto que uno simple -- al
-  // revés de lo que un ojo de sastre esperaría. 9 y 10 quedan reservados
-  // para "todos los pares excelente" (10) o el escalón inmediato debajo
-  // sin llegar ahí no existe más -- cualquier outfit con algo para ajustar,
-  // por mínimo que sea, topea en 8. Combinado con PUNTOS_POR_NIVEL.muy_bueno
-  // (bajado de 7 a 6 en la misma revisión), el caso de 5 excelente + 1
-  // muy_bueno ahora promedia (5*10+6)/6=9.33 -> redondea a 9 -> topeado a 8.
+  // Reemplazo: la nota se ANCLA en el peor par (PUNTOS_POR_NIVEL) y baja
+  // según cuántas PRENDAS haya que cambiar para arreglarlo (ver
+  // prendasACambiar -- no cuántos pares están mal: un solo calzado que
+  // desentona con las otras tres prendas es un problema, no tres). Así el
+  // puntaje es monótono y no depende del tamaño: sumar una prenda que no
+  // aporta defectos no sube ni baja nada, y sumar un defecto nuevo siempre
+  // baja. La distribución medida sobre el catálogo completo también se
+  // abre: antes el 62% de los outfits caía en el mismo 8 (la escala se
+  // había colapsado a "10 o 8", 5 o 4 estrellas y nada más).
   const todosExcelentes = pares.every((p) => p.score.nivel === "excelente");
-  const promedio = pares.reduce((acc, p) => acc + PUNTOS_POR_NIVEL[p.score.nivel], 0) / pares.length;
+  // "prolijo" queda AFUERA de los defectos a propósito -- ver el comentario
+  // de ScoreColor.tag: es el catch-all "esto está bien, sin nada
+  // destacable", no algo para arreglar. Un outfit sin ningún par excelente
+  // pero tampoco ningún defecto real (todos prolijos) no tiene ninguna
+  // prenda que cambiar, así que no entra en la escala de penalización: cae
+  // en PUNTAJE_SIN_DEFECTOS (8), el escalón honesto entre "impecable" (9-10)
+  // y "hay algo que arreglar" (<= 6).
+  const paresDefectuosos = pares.filter((p) => p.score.nivel !== "excelente" && p.score.tag !== "prolijo");
+  const hayChoqueReal = paresDefectuosos.some((p) => p.score.nivel === "con_cuidado");
+  const nivelDelDefecto = hayChoqueReal ? "con_cuidado" : "muy_bueno";
 
   // Acento aislado y piernas/torso casi idénticos (ver acentoDeColorAislado
   // y torsoYPiernasCasiIdenticos más arriba) -- calculados ACÁ, antes del
@@ -1611,15 +1704,12 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
   // que cuando haga una combinación sea buena y sea indiscutible"). Un
   // "10/10, sin nada que ajustar" al lado de una explicación que dice "pero
   // es el único toque de ese tono" o "podría quedar plano" es exactamente
-  // esa contradicción -- el mismo argumento, verificado en la auditoría de
-  // Consejo de esta ronda, que ya motivó bajar `muy_bueno` de 7 a 6 y topar
-  // "no todosExcelentes" en 8 en vez de 9 (ver el comentario de
-  // PUNTOS_POR_NIVEL): un defecto real no debe leerse como "casi perfecto".
-  // Acá el defecto es más chico (nada choca, es una oportunidad de
-  // refinamiento, no un error de color) -- por eso el piso es 9, no 8 --
-  // pero sigue siendo un defecto real, con usos y costumbres de sastrería/
-  // asesoría de imagen de por medio, así que un 10 limpio (sin ningún "pero")
-  // tiene que valer más que un 10 con nota al pie.
+  // esa contradicción -- el mismo argumento que después llevó a anclar toda
+  // la nota en el peor par (ver el comentario largo más arriba): un defecto
+  // real no debe leerse como "casi perfecto". Acá el defecto es más chico
+  // (nada choca, es una oportunidad de refinamiento, no un error de color y
+  // no hay ninguna prenda que CAMBIAR) -- por eso baja un solo escalón, a
+  // 9, en vez de entrar en la escala de defectos que arranca en 6.
   const acentoAislado = acentoDeColorAislado(prendas);
   const piernasTorsoIdenticos = torsoYPiernasCasiIdenticos(prendas);
   const tieneAjustePendiente = !!acentoAislado || !!piernasTorsoIdenticos;
@@ -1627,7 +1717,12 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
     ? tieneAjustePendiente
       ? 9
       : 10
-    : Math.max(1, Math.min(8, Math.round(promedio)));
+    : paresDefectuosos.length === 0
+      ? PUNTAJE_SIN_DEFECTOS
+      : Math.max(
+          PISO_POR_NIVEL[nivelDelDefecto],
+          PUNTOS_POR_NIVEL[nivelDelDefecto] - (prendasACambiar(paresDefectuosos) - 1),
+        );
 
   // Regla universal 60-30-10 (ver contarColoresProtagonistas) -- pensada
   // para MEJORAR LA EXPLICACIÓN, no el número: matemáticamente, con las
@@ -1637,10 +1732,10 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
   // (ver contarColoresProtagonistas). Por lo tanto, 4 grupos de color
   // realmente distintos y saturados a la vez (el único outfit posible acá
   // tiene 4 prendas -- piernas/torso/calzado/accesorio, el máximo del
-  // motor) nunca puede dar `todosExcelentes`: el promedio de pares ya
-  // queda bajo por su cuenta (como mucho 7, nunca 9 o 10) por la misma
-  // razón de siempre. Lo que faltaba no era topar el puntaje (ya está
-  // topado) sino la EXPLICACIÓN correcta: sin esto, un outfit así citaba
+  // motor) nunca puede dar `todosExcelentes`: por construcción hay pares
+  // que no llegan a excelente, así que la nota ya sale de la escala de
+  // defectos (<= 8) por su cuenta. Lo que faltaba no era bajar el puntaje
+  // (ya baja solo) sino la EXPLICACIÓN correcta: sin esto, un outfit así citaba
   // el motivo de UN par al azar ("funciona, pero se nota") en vez de
   // nombrar la causa real y completa (demasiados colores compitiendo a la
   // vez, ninguno domina) -- el diagnóstico que de verdad describe 60-30-10.
@@ -2232,8 +2327,32 @@ export function armarOutfitsSugeridos(placard: Prenda[], clima: Estacion = estac
               prendasDeTorso.every((p) => !chocan(a.prenda, p, placard)) &&
               !(calzadoElegido && chocan(a.prenda, calzadoElegido.prenda, placard)),
           );
-          const accesorioOpciones: Array<{ prenda: Prenda } | undefined> =
-            accesoriosValidos.length > 0 ? accesoriosValidos : [undefined];
+          // La variante SIN accesorio se ofrece SIEMPRE, no solo cuando
+          // ningún accesorio combina -- auditoría de Consejo, bug real
+          // medido sobre el catálogo completo: la pestaña "Urbano" quedaba
+          // en CERO outfits (7770 combinaciones pasaban outfitSirveParaEstilo
+          // y las 7770 se caían después), y en 7690 de esas el culpable era
+          // el accesorio: ningún cinturón/bufanda del catálogo está tageado
+          // "urbano", y outfitEsCoherenteParaEstilo exige que TODA prenda
+          // del outfit tenga el estilo tageado. Como el accesorio se
+          // forzaba apenas combinara en color, no quedaba ni una sola
+          // versión sin cinturón donde caer.
+          //
+          // Es el MISMO bug estructural que ya se había arreglado para el
+          // cinturón formal/oficina en "Clásico" (ver
+          // accesorioPuedeServirParaAncla más arriba), pero reaparecido por
+          // la puerta de al lado: ese filtro compara el accesorio contra el
+          // ANCLA, y un cinturón clasico+casual comparte "casual" con un
+          // pantalón urbano+casual, así que pasa el chequeo y después mata
+          // la pestaña urbana igual. En vez de agregar un tercer filtro
+          // (que necesitaría saber para qué estilo se está armando, dato
+          // que este pool global no tiene), se genera la variante sin
+          // accesorio en paralelo: cada pestaña se queda con la que le
+          // sirve, y ninguna prenda opcional puede volver a dejar un
+          // registro entero sin opciones. Un outfit sin cinturón/bufanda es
+          // perfectamente normal en el vestir real -- por eso el mismo
+          // criterio NO se aplica al calzado, que sí es obligatorio.
+          const accesorioOpciones: Array<{ prenda: Prenda } | undefined> = [...accesoriosValidos, undefined];
 
           for (const accesorioElegido of accesorioOpciones) {
             const prendas = [ancla, ...prendasDeTorso, calzadoElegido?.prenda, accesorioElegido?.prenda].filter(

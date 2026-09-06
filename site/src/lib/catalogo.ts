@@ -705,6 +705,20 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     suelaContraste: true,
     corteCalzado: "zapatilla_urbana",
   },
+  // estilosSecundarios "oficina" -- auditoría de Consejo, hueco real medido
+  // sobre el catálogo completo: la pestaña "Oficina" quedaba en CERO
+  // outfits posibles porque NINGÚN calzado del catálogo tenía ese tag (5016
+  // de 5016 combinaciones descartadas por el calzado), y
+  // outfitEsCoherenteParaEstilo exige que TODA prenda del outfit tenga el
+  // estilo tageado. Como todo outfit lleva calzado, el registro entero era
+  // inalcanzable -- ni armándolo con el catálogo entero en el placard, ni
+  // comprando: las sugerencias de compra salen de este mismo catálogo. El
+  // tag es correcto por usos y costumbres antes que por conveniencia: el
+  // zapato de vestir con cordones y el mocasín SON el calzado del look de
+  // oficina real (pantalón de vestir + camisa o sweater, sin corbata ni
+  // saco -- ver Estilo en types.ts). No se toca `estilo` (sigue siendo
+  // "formal"/"clasico", su registro principal), solo se declara el
+  // secundario que faltaba.
   {
     id: "zapatos-cuero-negro",
     nombre: "Zapatos de vestir negros",
@@ -712,6 +726,7 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     colorHex: "#1C1210",
     textura: "cuero_liso",
     estilo: "formal",
+    estilosSecundarios: ["oficina"],
     ocasion: "laburo",
     corteCalzado: "zapato_vestir",
   },
@@ -722,6 +737,7 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     colorHex: "#5C3A21",
     textura: "cuero_liso",
     estilo: "formal",
+    estilosSecundarios: ["oficina"],
     ocasion: "laburo",
     corteCalzado: "zapato_vestir",
   },
@@ -784,7 +800,10 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     colorHex: "#1C1210",
     textura: "cuero_liso",
     estilo: "clasico",
-    estilosSecundarios: ["casual"],
+    // "oficina" -- mismo motivo que los zapatos de vestir de más arriba
+    // (ver ese comentario): un mocasín es calzado de oficina real, y sin
+    // ningún calzado tageado así la pestaña entera quedaba sin opciones.
+    estilosSecundarios: ["casual", "oficina"],
     ocasion: "casual",
     corteCalzado: "mocasin",
   },
@@ -795,7 +814,7 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     colorHex: "#5C3A21",
     textura: "cuero_liso",
     estilo: "clasico",
-    estilosSecundarios: ["casual"],
+    estilosSecundarios: ["casual", "oficina"],
     ocasion: "casual",
     corteCalzado: "mocasin",
   },

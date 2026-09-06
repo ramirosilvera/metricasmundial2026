@@ -1719,9 +1719,13 @@ describe("armarOutfitsSugeridos", () => {
       mkPrenda("accesorio", "#8C8C8C", 0, 0, 55), // gris neutro -- combina con cualquier cosa, sin ambigüedad
     ];
     const outfits = armarOutfitsSugeridos(placard, "verano");
-    expect(outfits).toHaveLength(1);
-    expect(outfits[0].prendas.map((p) => p.categoria).sort()).toEqual(
-      ["accesorio", "calzado", "pantalon", "remera"].sort(),
+    // 2 variantes: el outfit completo y el mismo SIN accesorio -- ver el
+    // comentario de accesorioOpciones en recommend.ts (la variante sin
+    // accesorio se ofrece siempre, para que un cinturón que no está
+    // tageado para un estilo no deje ese registro sin ninguna opción).
+    expect(outfits).toHaveLength(2);
+    expect(outfits.map((o) => o.prendas.map((p) => p.categoria).sort().join("+")).sort()).toEqual(
+      ["accesorio+calzado+pantalon+remera", "calzado+pantalon+remera"].sort(),
     );
   });
 
@@ -1895,9 +1899,10 @@ describe("armarOutfitsSugeridos", () => {
       mkPrenda("accesorio", "#8C8C8C", 0, 0, 55),
     ];
     const outfits = armarOutfitsSugeridos(placard, "verano");
-    expect(outfits).toHaveLength(2);
+    // los 2 accesorios + la variante sin accesorio (ver accesorioOpciones)
+    expect(outfits).toHaveLength(3);
     const accesorios = outfits.map((o) => o.prendas.find((p) => p.categoria === "accesorio")?.color_hex).sort();
-    expect(accesorios).toEqual(["#5C3A21", "#8C8C8C"]);
+    expect(accesorios).toEqual(["#5C3A21", "#8C8C8C", undefined]);
   });
 
   it("combina cada torso con cada calzado válido (producto cartesiano), no solo torso con torso", () => {
@@ -2095,7 +2100,12 @@ describe("armarOutfitsSugeridos", () => {
       const cinturon = mkConEstilo("accesorio", "#1A1A1A", 0, 0, 10, "casual");
 
       const outfits = armarOutfitsSugeridos([pantalonCasual, buzoCasual, cinturon], "entretiempo");
-      expect(outfits).toHaveLength(1);
+      // con accesorio + la variante sin accesorio (ver accesorioOpciones);
+      // lo que este test cuida es que el cinturón SÍ se ofrezca cuando el
+      // ancla no es deportiva -- con un ancla deportiva no aparecería en
+      // ninguna de las dos.
+      expect(outfits).toHaveLength(2);
+      expect(outfits.some((o) => o.prendas.some((p) => p.categoria === "accesorio"))).toBe(true);
       expect(outfits[0].prendas.map((p) => p.categoria).sort()).toEqual(["accesorio", "buzo", "pantalon"].sort());
     });
   });
@@ -3882,18 +3892,19 @@ describe("puntuarOutfit", () => {
     expect(r.explicacion).toContain("cuero se coordina aparte");
   });
 
-  it("promedia sobre TODOS los pares, no solo contra la primera prenda", () => {
-    // pantalón + remera (mismo color, excelente) + calzado más informal que
-    // el pantalón (muy_bueno) -- promedio (10+10+6)/3 = 8.67 -> redondea a
-    // 9 -> topeado a 8 (pantalón-remera, pantalón-calzado, remera-calzado;
-    // remera-calzado también excelente por ser el mismo color exacto).
+  it("evalúa TODOS los pares, no solo los que tocan a la primera prenda", () => {
+    // la remera va PRIMERA a propósito: el defecto vive entre el pantalón y
+    // el calzado (salto de registro), un par que no la incluye. Si la
+    // función solo mirara los pares contra la primera prenda, este outfit
+    // daría 10.
+    const remera = mkPrenda("remera", "#1A1A1A", 0, 0, 10);
     const pantalonVestir = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10);
     pantalonVestir.estilo = "formal";
-    const remera = mkPrenda("remera", "#1A1A1A", 0, 0, 10);
     const zapatillas = mkPrenda("calzado", "#1A1A1A", 0, 0, 10);
     zapatillas.estilo = "urbano";
-    const r = puntuarOutfit([pantalonVestir, remera, zapatillas]);
-    expect(r.puntaje).toBe(8);
+    const r = puntuarOutfit([remera, pantalonVestir, zapatillas]);
+    expect(r.puntaje).toBe(6); // 1 defecto real, 1 prenda para cambiar (el calzado)
+    expect(r.explicacion).toContain("más informal que el pantalón");
   });
 
   it("puntaje siempre entre 1 y 10 (clamp), redondeado", () => {
@@ -3905,29 +3916,75 @@ describe("puntuarOutfit", () => {
     expect(Number.isInteger(r.puntaje)).toBe(true);
   });
 
-  // Auditoría de Consejo (lógica/motor): con 4 prendas hay 6 pares -- 5
-  // excelente + 1 muy_bueno promedia (5*10+6)/6 = 9.33, que Math.round
-  // sube a 9 -- topeado a 8 (segunda vuelta de auditoría, pedido explícito
-  // del usuario: "veo un 9/10 que debería ser menos"). Un outfit de 4
-  // prendas con un salto de registro real (acá: pantalón de vestir +
-  // zapatillas urbanas, mismo color exacto en las 4 prendas para que el
-  // resto de los pares sea excelente sin ambigüedad) mostraba antes
-  // "10/10" (bug de redondeo original) y después "9/10" (todavía muy alto
-  // para un defecto real) al lado de una explicación citando el defecto
-  // -- una contradicción directa entre el número y el texto, confirmada
-  // con el catálogo real (180 outfits de armarOutfitsSugeridos caían en
-  // este caso antes del primer fix).
-  it("5 pares excelente + 1 muy_bueno (avg 9.33) -> topea en 8, nunca en 9 o 10 sin ser todosExcelentes", () => {
+  // Auditoría de Consejo (rol sastre), el hallazgo central de la revisión
+  // del sistema de puntuación: mientras el puntaje fue un PROMEDIO de
+  // pares, el mismo defecto valía distinto según cuántas prendas tuviera el
+  // outfit -- medido por ejecución contra el catálogo real, con el par
+  // "pantalón de vestir + zapatillas urbanas" (un salto de registro) como
+  // único defecto: 6/10 con 2 prendas, 8/10 con 3, 8/10 con 4. Agregar una
+  // camisa que no tenía NADA que ver con el defecto subía la nota dos
+  // puntos, porque sumaba pares excelentes que promediaban hacia arriba
+  // (el tope de 8 de la ronda anterior aplastaba el techo, pero la
+  // dilución seguía intacta por debajo). Un sastre lee al revés: el
+  // conjunto vale lo que su eslabón más flojo. Con la nota anclada al peor
+  // par, el mismo defecto vale lo mismo sin importar el tamaño.
+  it("el mismo defecto vale igual con 2, 3 o 4 prendas -- sumar prendas sanas ya no diluye el defecto", () => {
     const pantalonVestir = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10);
     pantalonVestir.estilo = "formal";
     const camisa = mkPrenda("camisa", "#1A1A1A", 0, 0, 10);
     const zapatillas = mkPrenda("calzado", "#1A1A1A", 0, 0, 10);
     zapatillas.estilo = "urbano";
     const cinturon = mkPrenda("accesorio", "#1A1A1A", 0, 0, 10);
-    const r = puntuarOutfit([pantalonVestir, camisa, zapatillas, cinturon]);
+
+    const dos = puntuarOutfit([pantalonVestir, zapatillas]);
+    const tres = puntuarOutfit([pantalonVestir, camisa, zapatillas]);
+    const cuatro = puntuarOutfit([pantalonVestir, camisa, zapatillas, cinturon]);
+
+    expect(dos.puntaje).toBe(6);
+    expect(tres.puntaje).toBe(6);
+    expect(cuatro.puntaje).toBe(6);
+    expect(cuatro.explicacion).not.toContain("Combinación segura");
+    expect(cuatro.explicacion).toContain("más informal que el pantalón");
+  });
+
+  // Contracara del anterior: dos defectos INDEPENDIENTES (dos prendas
+  // distintas para cambiar) sí tienen que pesar más que uno solo -- es la
+  // única forma en que la cantidad importa ahora.
+  it("dos defectos INDEPENDIENTES pesan más que uno, pero varios pares del mismo culpable siguen siendo un solo problema", () => {
+    const pantalonVestir = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10);
+    pantalonVestir.estilo = "formal";
+    const zapatillas = mkPrenda("calzado", "#1A1A1A", 0, 0, 10);
+    zapatillas.estilo = "urbano"; // defecto 1: registro, contra el pantalón
+
+    // un buzo casual suma un SEGUNDO par defectuoso, pero contra el mismo
+    // pantalón -- cambiando esa única prenda se arreglan los dos, así que
+    // sigue siendo un solo problema y la nota no baja (el sastre dice "ese
+    // pantalón no va con este conjunto", no "cambiá dos cosas").
+    const buzo = mkPrenda("buzo", "#1A1A1A", 0, 0, 10);
+    buzo.estilo = "casual";
+    expect(puntuarOutfit([pantalonVestir, zapatillas]).puntaje).toBe(6);
+    expect(puntuarOutfit([pantalonVestir, zapatillas, buzo]).puntaje).toBe(6);
+
+    // en cambio, un defecto que NO comparte prenda con el primero (remera
+    // azul + cinturón naranja: complementarios intensos, "combinación
+    // audaz") obliga a tocar una segunda prenda -> un punto menos.
+    const remeraAzul = mkPrenda("remera", "#1F3F8F", 220, 80, 30);
+    const cinturonNaranja = mkPrenda("accesorio", "#E8A15C", 40, 80, 70);
+    const dosIndependientes = puntuarOutfit([pantalonVestir, zapatillas, remeraAzul, cinturonNaranja]);
+    expect(dosIndependientes.puntaje).toBe(5);
+  });
+
+  // Un par "prolijo" (el catch-all de la regla 6 de scoreColor: "contraste
+  // moderado" / "matices relacionados") NO es un defecto -- no hay ninguna
+  // prenda para cambiar. Hallazgo de esta misma ronda al anclar la nota al
+  // peor par: sin esta distinción, un outfit correcto sin nada para
+  // señalar caía a 3 estrellas junto con los que sí tienen un error real.
+  it("un par apenas 'prolijo' no cuenta como defecto: sin nada para arreglar, pero tampoco impecable", () => {
+    const pantalon = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10); // neutro
+    const remera = mkPrenda("remera", "#3366CC", 220, 60, 50); // azul saturado
+    const calzado = mkPrenda("calzado", "#5C3A21", 25, 50, 30); // marrón: contra el azul da la regla 6
+    const r = puntuarOutfit([pantalon, remera, calzado]);
     expect(r.puntaje).toBe(8);
-    expect(r.explicacion).not.toContain("Combinación segura");
-    expect(r.explicacion).toContain("más informal que el pantalón");
   });
 
   it("todos los pares excelente -> 10 siempre, sea cual sea el promedio (no hay promedio menor a 10 posible acá)", () => {
@@ -4186,7 +4243,11 @@ describe("mejorasDeReemplazo", () => {
     const mejor = armarOutfitsSugeridos(placard, "entretiempo")
       .filter((s) => outfitSirveParaEstilo(s.prendas, "formal"))
       .sort((a, b) => b.puntaje - a.puntaje)[0];
-    expect(mejor.puntaje).toBe(8); // ver el test de puntuarOutfit del fix de redondeo/exigencia
+    // 6 = un defecto real (el calzado informal) con UNA prenda para
+    // cambiar -- ver el test de puntuarOutfit sobre la nota anclada al peor
+    // par. Antes daba 8, por el promedio que diluía el defecto entre los
+    // pares sanos del resto del outfit.
+    expect(mejor.puntaje).toBe(6);
     expect(mejor.explicacionPuntaje).toContain("más informal que el pantalón");
 
     const reemplazos = mejorasDeReemplazo(mejor, placard);
@@ -4309,10 +4370,16 @@ describe("comboParaExcelencia", () => {
     const base = armarOutfitsSugeridos(placard, "entretiempo")
       .filter((s) => outfitSirveParaEstilo(s.prendas, "clasico"))
       .sort((a, b) => b.puntaje - a.puntaje)[0];
-    expect(base.puntaje).toBe(7);
-    // confirma la premisa: la mejor compra de UNA sola prenda no alcanza a 10.
+    expect(base.puntaje).toBe(6); // un defecto real, una prenda para cambiar (antes 7, por el promedio)
+    // Confirma la premisa: ninguna compra de UNA sola prenda resuelve esto.
+    // Con la nota anclada al peor par, además, ni siquiera mueve el número
+    // -- cambiar solo el calzado deja el torso sin resolver (y al revés),
+    // así que la nota sigue siendo la misma y mejorCompraParaSubirNota no
+    // devuelve nada. Es más honesto que el 7 -> 8 de la fórmula anterior,
+    // que sugería progreso sin haber arreglado el defecto: acá hacen falta
+    // las dos prendas juntas, que es justo lo que prueba el resto del test.
     const unaSola = mejorCompraParaSubirNota("clasico", base, placard);
-    expect(unaSola?.puntaje).toBeLessThan(10);
+    expect(unaSola === undefined || unaSola.puntaje < 10).toBe(true);
 
     const combo = comboParaExcelencia("clasico", base, placard);
     expect(combo).toBeDefined();

@@ -59,16 +59,25 @@ function leyenda(prendas: Prenda[]): string {
  *  las mismas clases `.nivel-*` que ya pintan Recomendaciones.tsx/
  *  Probar.tsx (verde/naranja/amarillo) -- mismo vocabulario visual de
  *  "qué tan bien combina" en toda la app, no una paleta nueva para esta
- *  sola pantalla. Con el tope de "no todosExcelentes" en 8 (ver
- *  PUNTOS_POR_NIVEL en recommend.ts), 9 es exclusivo del caso
- *  "todosExcelentes, pero con un ajuste pendiente" (acento de color aislado
- *  o piernas/torso casi idénticos -- ver `tieneAjustePendiente` en
- *  puntuarOutfit, auditoría de exigencia de Consejo) -- ya no es un valor
- *  inalcanzable, corta genuinamente entre "impecable con un pero" (9) y
- *  "impecable, sin ningún pero" (10). */
+ *  sola pantalla.
+ *
+ *  Cortes recalibrados contra la escala que dejó la revisión de Consejo del
+ *  sistema de puntuación (ver puntuarOutfit en recommend.ts) -- ahora cada
+ *  corte coincide exactamente con un nivel real del motor, sin numerología:
+ *   - 10 / 9  "excelente": ningún par por debajo de excelente (10 limpio, 9
+ *     con un refinamiento pendiente).
+ *   - 8 a 4   "muy_bueno": 8 = correcto pero sin nada destacable (ningún
+ *     defecto que arreglar); 6/5/4 = hay 1, 2 o 3+ prendas para cambiar por
+ *     un defecto real de registro/volumen/color, pero nada que CHOQUE.
+ *   - 3 o menos "con_cuidado": hay un choque real (cuero descoordinado,
+ *     corbata sin cuello, deportivo con prenda de vestir...).
+ *  El corte de abajo bajó de 7 a 4 en esta ronda: con la nota anclada al
+ *  peor par, un outfit con UN detalle de registro vale 6 -- pintarlo del
+ *  mismo rojo que un choque real (como hacía el corte viejo) exageraba el
+ *  problema tanto como el 8 de antes lo escondía. */
 function nivelDePuntaje(puntaje: number): "excelente" | "muy_bueno" | "con_cuidado" {
   if (puntaje >= 9) return "excelente";
-  if (puntaje >= 7) return "muy_bueno";
+  if (puntaje >= 4) return "muy_bueno";
   return "con_cuidado";
 }
 
