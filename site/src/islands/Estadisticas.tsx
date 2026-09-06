@@ -7,12 +7,14 @@ import {
   contarPorEstacion,
   contarPorEstilo,
   type AnalisisFoda,
+  type CompraPrioritaria,
   type ConteoCategoria,
   type ConteoColor,
   type ConteoEstacion,
   type ConteoEstilo,
   type EstrategiaFoda,
 } from "../lib/estadisticas";
+import { ESTILO_LABEL } from "../lib/recommend";
 import { SUPABASE_CONFIGURADO, supabase } from "../lib/supabase";
 import type { Prenda } from "../lib/types";
 import ConfigWarning from "./ConfigWarning";
@@ -267,6 +269,57 @@ export function EstrategiasFoda({ estrategias }: { estrategias: EstrategiaFoda[]
   );
 }
 
+/** Prefill del form de "prenda nueva" -- mismo mecanismo y misma clave que
+ *  ya usa cargarSugerencia en Outfits.tsx (ver PrendaForm.tsx, que lee esta
+ *  clave exacta de sessionStorage) -- no se reinventa un segundo camino
+ *  para "comprá esto" solo porque vive en otra pantalla. */
+function cargarSugerenciaDeCompra(sugerida: CompraPrioritaria["sugerida"], base: string) {
+  try {
+    sessionStorage.setItem(
+      "mi_ropa_prueba_prefill",
+      JSON.stringify({ categoria: sugerida.categoria, colorHex: sugerida.colorHex, presetId: sugerida.id }),
+    );
+  } catch {
+    // Storage bloqueado -- se navega igual, el form arranca en blanco.
+  }
+  window.location.href = `${base}prenda/nueva/`;
+}
+
+/** La recomendación de compra GENERAL -- pedido explícito del usuario: "una
+ *  recomendación de compra general que surja del FODA y de los outfits en
+ *  estadísticas", actuando en múltiples roles (asesor de imagen, sastre,
+ *  experto en moda/colores/prendas, gerente ejecutivo). A diferencia de
+ *  TablaFoda/GraficoFoda (que muestran los 4 cuadrantes completos, para
+ *  quien quiera el detalle) esta tarjeta es LA síntesis ejecutiva: de todos
+ *  los huecos reales del placard, cuál conviene resolver primero -- ver
+ *  compraDeMayorImpacto en estadisticas.ts para el criterio completo
+ *  (severidad del hueco, y a igual severidad, cuántos estilos resuelve la
+ *  misma compra a la vez). Se muestra ANTES del plan de acción TOWS (que
+ *  sigue disponible con el detalle completo) porque es la única acción
+ *  puntual y comprable de todo el diagnóstico -- las estrategias TOWS
+ *  cruzan hallazgos, esto dice qué hacer primero. `null` (placard sin
+ *  ningún hueco) no renderiza nada -- no hay una "recomendación de que no
+ *  hay nada que comprar" real que valga la pena mostrar. */
+export function CompraPrioritariaCard({ compra, base }: { compra: CompraPrioritaria; base: string }) {
+  return (
+    <div className="card" style={{ borderLeft: "4px solid var(--accent)", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+      <p className="eyebrow" style={{ margin: 0 }}>
+        Compra prioritaria · {ESTILO_LABEL[compra.estilo]}
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <span className="color-chip-swatch" style={{ background: compra.sugerida.colorHex, width: "2rem", height: "2rem", flexShrink: 0 }} />
+        <div>
+          <strong style={{ display: "block" }}>{compra.sugerida.nombre}</strong>
+          <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>{compra.mensaje}</span>
+        </div>
+      </div>
+      <button type="button" className="btn btn-primary" onClick={() => cargarSugerenciaDeCompra(compra.sugerida, base)}>
+        Cargar esta prenda
+      </button>
+    </div>
+  );
+}
+
 export function ChipsColores({ datos }: { datos: ConteoColor[] }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -397,6 +450,12 @@ export default function Estadisticas() {
         <div style={{ marginBottom: "0.75rem" }}>
           <VeredictoFoda analisis={analisis} />
         </div>
+
+        {analisis.compraPrioritaria && (
+          <div style={{ marginBottom: "0.75rem" }}>
+            <CompraPrioritariaCard compra={analisis.compraPrioritaria} base={base} />
+          </div>
+        )}
 
         <div className="card" style={{ marginBottom: "0.75rem" }}>
           <p className="eyebrow" style={{ marginBottom: "0.6rem" }}>

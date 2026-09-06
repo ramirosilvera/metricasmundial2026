@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { analizarFoda, coincideBusqueda, contarPorCategoria, contarPorColor, contarPorEstacion, contarPorEstilo } from "./estadisticas";
-import type { Prenda } from "./types";
+import type { PresetPrenda } from "./catalogo";
+import { analizarFoda, coincideBusqueda, compraDeMayorImpacto, contarPorCategoria, contarPorColor, contarPorEstacion, contarPorEstilo } from "./estadisticas";
+import type { HSL, Prenda } from "./types";
 
 function mkPrenda(
   categoria: Prenda["categoria"],
@@ -346,6 +347,78 @@ describe("analizarFoda -- estrategias cruzadas (matriz TOWS)", () => {
     expect(tipos).toContain("DO");
     expect(tipos).not.toContain("FA");
     expect(tipos).not.toContain("DA");
+  });
+});
+
+// Consejo, auditoría de exigencia -- pedido explícito del usuario: "mejora
+// el algoritmo de recomendación de compra en cada estilo del outfit y tmb
+// incluí una recomendación de compra general que surja del FODA y de los
+// outfits en estadísticas. Actuá en múltiples roles: asesor de imagen,
+// sastre, experto en moda, en colores, en prendas, gerente ejecutivo."
+describe("compraDeMayorImpacto", () => {
+  it("severidad gana sobre variedad: sin ancla en un estilo le gana a poca variedad en otro, sea cual sea el orden de ESTILOS", () => {
+    // catálogo chico a propósito (mismo patrón que sugerenciaDeAncla en
+    // recommend.test.ts): solo lo justo para que "formal" y "casual" sean
+    // los dos únicos estilos con algo que ofrecer -- oficina/clasico/urbano/
+    // deportivo no tienen ningún pantalón de su estilo en este catálogo, así
+    // que huecoDeEstilo da null para los cuatro (sin ambigüedad sobre cuál
+    // gana).
+    const catalogoChico: (PresetPrenda & { hsl: HSL })[] = [
+      { id: "pantalon-formal", nombre: "Pantalón formal", categoria: "pantalon", colorHex: "#1A1A1A", estilo: "formal", hsl: { h: 0, s: 0, l: 10 } },
+      { id: "remera-casual", nombre: "Remera casual", categoria: "remera", colorHex: "#FFFFFF", estilo: "casual", hsl: { h: 0, s: 0, l: 95 } },
+    ];
+    // "casual" ya tiene ancla -- sin hueco de tier 0 -- pero una sola prenda
+    // de torso, así que sugerenciaDeVariedad dispara (tier 5). "formal" no
+    // tiene NINGÚN pantalón (tier 0, el bloqueo total).
+    const pantalonCasual = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10, "casual");
+    const remeraCasual = mkPrenda("remera", "#8C8C8C", 0, 0, 55, "casual");
+    const zapato1 = mkPrenda("calzado", "#1A1A1A", 0, 0, 10, "casual");
+    const zapato2 = mkPrenda("calzado", "#FFFFFF", 0, 0, 95, "casual");
+    const placard = [pantalonCasual, remeraCasual, zapato1, zapato2];
+
+    const r = compraDeMayorImpacto(placard, catalogoChico);
+    expect(r).not.toBeNull();
+    expect(r!.estilo).toBe("formal");
+    expect(r!.sugerida.id).toBe("pantalon-formal");
+  });
+
+  it("la misma prenda del catálogo resuelve el hueco de más de un estilo a la vez -> el mensaje lo nombra explícitamente", () => {
+    // un solo chino, clasico+casual -- evaluado de forma independiente para
+    // cada estilo (huecoDeEstilo no comparte ningún estado entre llamadas),
+    // el catálogo elige exactamente ESTA MISMA prenda para los dos porque es
+    // la única candidata en ambos casos. Ningún otro estilo tiene ningún
+    // pantalón en este catálogo, así que no compite ninguna otra sugerencia.
+    const catalogoVersatil: (PresetPrenda & { hsl: HSL })[] = [
+      {
+        id: "chino-versatil",
+        nombre: "Pantalón chino",
+        categoria: "pantalon",
+        colorHex: "#D8C7A1",
+        estilo: "clasico",
+        estilosSecundarios: ["casual"],
+        hsl: { h: 41, s: 41, l: 74 },
+      },
+    ];
+    const r = compraDeMayorImpacto([], catalogoVersatil);
+    expect(r).not.toBeNull();
+    expect(r!.sugerida.id).toBe("chino-versatil");
+    expect(r!.mensaje).toContain("también te resuelve un hueco en Casual");
+  });
+
+  it("sin ningún hueco real en ningún estilo (catálogo vacío) -> null, no inventa una recomendación", () => {
+    expect(compraDeMayorImpacto([], [])).toBeNull();
+  });
+
+  it("analizarFoda expone la misma recomendación como compraPrioritaria, consistente con sus propias oportunidades", () => {
+    const r = analizarFoda([mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")]);
+    expect(r.compraPrioritaria).not.toBeNull();
+    // la compra prioritaria tiene que ser, literalmente, una de las
+    // oportunidades ya listadas -- nunca un texto distinto calculado aparte.
+    expect(r.oportunidades).toContain(r.compraPrioritaria!.mensaje.split(" Esta misma compra")[0]);
+  });
+
+  it("placard vacío del todo -> analizarFoda no propone compraPrioritaria (sin diagnóstico posible)", () => {
+    expect(analizarFoda([]).compraPrioritaria).toBeNull();
   });
 });
 

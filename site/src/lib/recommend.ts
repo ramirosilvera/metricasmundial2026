@@ -2764,7 +2764,24 @@ export function mejorCompraParaSubirNota(
     (c) =>
       c.puntaje > base.puntaje && outfitSirveParaEstilo([...c.prendasPropias, presetAPrendaSintetica(c.sugerida)], estilo),
   );
-  return [...reemplazos, ...ausentes].sort((a, b) => b.puntaje - a.puntaje)[0];
+  // Desempate por color -- auditoría de exigencia de Consejo (rol: experto
+  // en colores), pedido explícito del usuario: "mejora el algoritmo de
+  // recomendación de compra". Antes de este ajuste, entre dos compras que
+  // suben a EXACTAMENTE el mismo puntaje (caso frecuente: varios calzados
+  // negros del catálogo combinan igual de bien), ganaba la primera en
+  // aparecer en `reemplazos`/`ausentes` -- un orden que depende del ID del
+  // catálogo, no de cuál es mejor consejo. Con `compararNeutralidadColor`
+  // de por medio, a igual puntaje gana la prenda de color más neutro/
+  // reusable en el resto del placard. Deliberadamente NO usa
+  // `compararVersatilidad` (que además mira cuántos registros cubre la
+  // prenda) -- ver el comentario largo de compararNeutralidadColor sobre el
+  // hallazgo real de esta ronda: para un outfit "Formal" puntual, esa
+  // versión prefería un mocasín (clasico+casual) por sobre el zapato de
+  // vestir con cordones, la elección de sastrería incorrecta para un traje
+  // completo. Nunca cambia CUÁNTO sube la nota (eso sigue siendo b.puntaje
+  // - a.puntaje primero, sin excepción) -- solo desempata entre opciones
+  // que suben la nota exactamente igual.
+  return [...reemplazos, ...ausentes].sort((a, b) => b.puntaje - a.puntaje || compararNeutralidadColor(a.sugerida, b.sugerida))[0];
 }
 
 export interface ComboParaExcelencia {
@@ -2855,6 +2872,25 @@ export function comboParaExcelencia(
       : catalogo.filter((p) => p.categoria === categoriaOriginal)
     ).filter((p) => !restantes.some((r) => r.categoria === p.categoria));
 
+  // Auditoría de exigencia de Consejo (rol: experto en colores), pedido
+  // explícito del usuario ("mejora el algoritmo de recomendación de
+  // compra"): antes de este ajuste, esta función devolvía el PRIMER combo
+  // de dos prendas que llegaba a 10 -- un orden que depende pura y
+  // exclusivamente de en qué posición del catálogo caen esas prendas, no de
+  // cuál es la mejor recomendación real. Ahora junta TODOS los combos
+  // válidos (el catálogo es chico, ver el comentario de arriba: miles de
+  // combinaciones, no millones) y se queda con el de menor rango de color
+  // combinado (`rangoColorVersatil` sobre las dos sugeridas, mismo criterio
+  // que compararNeutralidadColor) -- a igual puntaje (siempre 10 acá, por
+  // construcción) y a igual outfit base, dos prendas de colores más
+  // neutros/reusables son mejor consejo de compra que dos que solo
+  // resuelven este outfit puntual con un color más específico. NO desempata
+  // por versatilidad de estilo -- ver el comentario largo de
+  // compararNeutralidadColor sobre por qué ese criterio es incorrecto para
+  // una recomendación sobre UN outfit puntual (podría preferir una prenda
+  // menos formal solo por servir para más ocasiones).
+  const combosValidos: ComboParaExcelencia[] = [];
+
   for (let i = 0; i < otras.length; i++) {
     for (let j = i + 1; j < otras.length; j++) {
       const restantes = base.prendas.filter((p) => p.id !== otras[i].id && p.id !== otras[j].id);
@@ -2886,19 +2922,31 @@ export function comboParaExcelencia(
           const { puntaje, explicacion } = puntuarOutfit(outfitCompleto);
           if (puntaje !== 10) continue;
 
-          return {
+          combosValidos.push({
             id: `combo-${ancla.id}-${presetA.id}-${presetB.id}`,
             prendasPropias: restantes,
             sugeridas: [presetA, presetB],
             puntaje: 10,
             explicacionPuntaje: explicacion,
-          };
+          });
         }
       }
     }
   }
 
-  return undefined;
+  if (combosValidos.length === 0) return undefined;
+  // Desempate por color, no por versatilidad de estilo -- mismo motivo que
+  // mejorCompraParaSubirNota (ver el comentario largo de
+  // compararNeutralidadColor): dos prendas que además completan un traje
+  // "Formal" no deberían perder contra un par más versátil pero menos
+  // formal, así que se suma SOLO el rango de color de las dos sugeridas.
+  return combosValidos.sort(
+    (x, y) =>
+      rangoColorVersatil(nombreColor(x.sugeridas[0].hsl.h, x.sugeridas[0].hsl.s, x.sugeridas[0].hsl.l)) +
+      rangoColorVersatil(nombreColor(x.sugeridas[1].hsl.h, x.sugeridas[1].hsl.s, x.sugeridas[1].hsl.l)) -
+      (rangoColorVersatil(nombreColor(y.sugeridas[0].hsl.h, y.sugeridas[0].hsl.s, y.sugeridas[0].hsl.l)) +
+        rangoColorVersatil(nombreColor(y.sugeridas[1].hsl.h, y.sugeridas[1].hsl.s, y.sugeridas[1].hsl.l))),
+  )[0];
 }
 
 export interface SugerenciaVariedad {
@@ -2913,6 +2961,74 @@ export interface SugerenciaVariedad {
 // blanco/negro/gris combina con más cosas que un color puntual), mismo
 // criterio de versatilidad que ya prioriza el catálogo real.
 const NEUTROS_PRIORIDAD_COMPRA = ["Blanco", "Negro", "Gris", "Azul marino", "Beige"];
+
+/** Rango de versatilidad de color -- factorizado de dos copias inline
+ *  idénticas (mejorCandidatoDelCatalogo/mejorAnclaDelCatalogo) para poder
+ *  reusarlo también como desempate entre compras que llegan al MISMO
+ *  puntaje (ver `versatilidad` más abajo y su uso en
+ *  mejorCompraParaSubirNota/comboParaExcelencia) -- auditoría de exigencia
+ *  de Consejo (rol: gerente ejecutivo/experto en moda), pedido explícito
+ *  del usuario: "mejora el algoritmo de recomendación de compra". Menor es
+ *  mejor (0 = el más versátil de la lista). */
+function rangoColorVersatil(nombre: string): number {
+  const i = NEUTROS_PRIORIDAD_COMPRA.indexOf(nombre);
+  return i === -1 ? NEUTROS_PRIORIDAD_COMPRA.length : i;
+}
+
+/** Desempate por color entre dos compras que llegan al MISMO puntaje sobre
+ *  UN outfit puntual (mejorCompraParaSubirNota/comboParaExcelencia): a
+ *  igual resultado sobre ESE outfit, el color más neutro/reusable
+ *  (`rangoColorVersatil`) es mejor consejo por defecto -- sigue sirviendo
+ *  para más combinaciones futuras sin cambiar en nada qué tan bien resuelve
+ *  el outfit de hoy. Auditoría de exigencia de Consejo (rol: experto en
+ *  colores), pedido explícito del usuario: "mejora el algoritmo de
+ *  recomendación de compra".
+ *
+ *  A propósito NO mira cuántos registros (`estilosDe`) cubre la prenda acá
+ *  -- eso es "versatilidad de estilo" (ver `versatilidad`/
+ *  `compararVersatilidad` más abajo), un criterio correcto para "¿qué
+ *  compra rinde más en TODO tu placard?" pero incorrecto acá: hallazgo real
+ *  de esta ronda, verificado por ejecución -- para completar un outfit
+ *  "Formal" (traje completo), preferir un mocasín (clasico+casual, 2
+ *  registros) por sobre un zapato de vestir con cordones (formal, 1
+ *  registro) rompía la convención real de sastrería que el motor ya
+ *  respeta en otro lado (CORTES_DE_VESTIR): un traje pide el zapato MÁS
+ *  formal disponible, no el más versátil para otras ocasiones -- "sirve
+ *  para más cosas" es una virtud al comprar en general, no al vestir un
+ *  traje en particular. */
+function compararNeutralidadColor(a: PresetPrenda & { hsl: HSL }, b: PresetPrenda & { hsl: HSL }): number {
+  const nombreA = nombreColor(a.hsl.h, a.hsl.s, a.hsl.l);
+  const nombreB = nombreColor(b.hsl.h, b.hsl.s, b.hsl.l);
+  return rangoColorVersatil(nombreA) - rangoColorVersatil(nombreB);
+}
+
+/** Cuántos registros cubre una prenda del catálogo -- estilo principal +
+ *  todos sus estilos_secundarios (vía estilosDe). Usada SOLO por la
+ *  recomendación de compra GENERAL (compraDeMayorImpacto, en
+ *  estadisticas.ts): ahí la pregunta es real y distinta de la de un outfit
+ *  puntual -- "de todos los huecos de TODO el placard, ¿cuál conviene
+ *  resolver primero?" -- y una compra que tapa el hueco de MÁS de un
+ *  estilo a la vez es, ahí sí, sin ambigüedad, mejor negocio que una que
+ *  solo tapa uno. Ver el comentario de compararNeutralidadColor arriba
+ *  sobre por qué este mismo criterio NO se usa para recomendaciones sobre
+ *  un outfit puntual. Auditoría de exigencia de Consejo (rol: gerente
+ *  ejecutivo), pedido explícito del usuario. */
+function versatilidad(preset: PresetPrenda & { hsl: HSL }): number {
+  return estilosDe(presetAPrendaSintetica(preset)).length;
+}
+
+/** Comparador para la recomendación de compra GENERAL (compraDeMayorImpacto
+ *  en estadisticas.ts): más versátil primero (`versatilidad`), y a igual
+ *  versatilidad, el color más neutro primero (`compararNeutralidadColor`).
+ *  NO USAR para una recomendación sobre un outfit puntual -- ver el
+ *  comentario de compararNeutralidadColor sobre por qué "versatilidad de
+ *  estilo" es el criterio equivocado ahí. */
+function compararVersatilidad(a: PresetPrenda & { hsl: HSL }, b: PresetPrenda & { hsl: HSL }): number {
+  const versA = versatilidad(a);
+  const versB = versatilidad(b);
+  if (versA !== versB) return versB - versA;
+  return compararNeutralidadColor(a, b);
+}
 
 /** Mejor prenda del catálogo para tapar un hueco puntual: de esa categoría,
  *  de ese estilo (por estilosDe -- cuenta un estilo secundario), que
@@ -2948,11 +3064,7 @@ function mejorCandidatoDelCatalogo(
     .filter((c) => c.score.nivel !== "con_cuidado")
     .sort((a, b) => {
       if (a.colorNuevo !== b.colorNuevo) return a.colorNuevo ? -1 : 1;
-      const rango = (nombre: string) => {
-        const i = NEUTROS_PRIORIDAD_COMPRA.indexOf(nombre);
-        return i === -1 ? NEUTROS_PRIORIDAD_COMPRA.length : i;
-      };
-      const diferenciaRango = rango(a.nombreColorPreset) - rango(b.nombreColorPreset);
+      const diferenciaRango = rangoColorVersatil(a.nombreColorPreset) - rangoColorVersatil(b.nombreColorPreset);
       if (diferenciaRango !== 0) return diferenciaRango;
       return nivelOrden(b.score.nivel) - nivelOrden(a.score.nivel);
     });
@@ -3025,11 +3137,15 @@ export function sugerenciaDeVariedad(
  *  sugerenciaDeVariedad (0 o 1 -> sumar de esa misma categoría, ver su
  *  comentario). `null` si ya hay 2+ opciones de calzado de este registro,
  *  o sin ancla para validar contra qué combina (mismo motivo: sin ancla
- *  no hay con qué comparar). Solo la usa auditoriaDeGuardarropa. */
-function sugerenciaDeCalzado(
+ *  no hay con qué comparar). Antes solo la usaba auditoriaDeGuardarropa
+ *  (misma archivo) -- exportada en la auditoría de exigencia de Consejo
+ *  para que estadisticas.ts pueda reusar la MISMA capa de detección de
+ *  huecos (nunca reinventarla) al armar la recomendación de compra general
+ *  del FODA, pedido explícito del usuario. */
+export function sugerenciaDeCalzado(
   estilo: Estilo,
   placard: Prenda[],
-  catalogo: (PresetPrenda & { hsl: HSL })[],
+  catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
 ): SugerenciaVariedad | null {
   const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
   const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
@@ -3075,13 +3191,9 @@ function mejorAnclaDelCatalogo(
   if (candidatos.length === 0) return undefined;
 
   if (torsosPropios.length === 0) {
-    return [...candidatos].sort((a, b) => {
-      const rango = (p: PresetPrenda & { hsl: HSL }) => {
-        const i = NEUTROS_PRIORIDAD_COMPRA.indexOf(nombreColor(p.hsl.h, p.hsl.s, p.hsl.l));
-        return i === -1 ? NEUTROS_PRIORIDAD_COMPRA.length : i;
-      };
-      return rango(a) - rango(b);
-    })[0];
+    return [...candidatos].sort(
+      (a, b) => rangoColorVersatil(nombreColor(a.hsl.h, a.hsl.s, a.hsl.l)) - rangoColorVersatil(nombreColor(b.hsl.h, b.hsl.s, b.hsl.l)),
+    )[0];
   }
 
   const evaluados = candidatos

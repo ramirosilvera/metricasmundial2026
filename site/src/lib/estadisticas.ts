@@ -1,6 +1,18 @@
 import { nombreColor } from "./color";
-import { categoriasAusentes, ESTILO_LABEL, estilosDe, sugerenciaDeAncla, sugerenciaDeVariedad } from "./recommend";
-import { CATEGORIA_LABEL, descripcionPrenda, ESTACION_LABEL, type Categoria, type Estacion, type Estilo, type Prenda } from "./types";
+import { CATALOGO_CON_HSL, type PresetPrenda } from "./catalogo";
+import {
+  categoriasAusentes,
+  ESTILO_LABEL,
+  estilosDe,
+  sugerenciaDeAbrigoEntretiempo,
+  sugerenciaDeAbrigoInvierno,
+  sugerenciaDeAncla,
+  sugerenciaDeAnclaInvernal,
+  sugerenciaDeCalzado,
+  sugerenciaDeSacoDeVerano,
+  sugerenciaDeVariedad,
+} from "./recommend";
+import { CATEGORIA_LABEL, descripcionPrenda, ESTACION_LABEL, type Categoria, type Estacion, type Estilo, type HSL, type Prenda } from "./types";
 
 /** Mismo orden que CATEGORIA_LABEL en types.ts -- se deriva de sus claves en
  *  vez de repetir el array a mano para no poder desincronizarse si se agrega
@@ -153,6 +165,16 @@ export interface AnalisisFoda {
    *  genera un cruce cuando los dos cuadrantes que lo alimentan tienen
    *  contenido real. */
   estrategias: EstrategiaFoda[];
+  /** La compra de mayor impacto de TODO el placard -- pedido explícito del
+   *  usuario: "una recomendación de compra general que surja del FODA y de
+   *  los outfits en estadísticas". A diferencia de `oportunidades` (una
+   *  lista plana, una por estilo con hueco), esto es LA prioridad -- ver
+   *  compraDeMayorImpacto más abajo para el criterio de selección (severidad
+   *  del hueco primero, versatilidad entre estilos como desempate). `null`
+   *  solo si de verdad no hay ningún hueco de compra en ninguno de los 6
+   *  estilos (placard maduro en todas las puntas) -- mismo criterio de "no
+   *  inventar una sugerencia sin motivo real" que el resto de este módulo. */
+  compraPrioritaria: CompraPrioritaria | null;
 }
 
 export type NivelSaludFoda = "solido" | "con_huecos" | "fragil";
@@ -294,6 +316,135 @@ function diagnosticoGeneral(
   };
 }
 
+/** Severidad real de un hueco de compra -- MISMO orden de impacto que ya usa
+ *  auditoriaDeGuardarropa en recommend.ts (ver su comentario largo ahí, "en
+ *  orden de impacto real sobre la cantidad de combinaciones posibles"),
+ *  generalizado acá para poder comparar huecos ENTRE estilos distintos, no
+ *  solo priorizarlos dentro de un mismo estilo:
+ *  0. sin ancla -- cero outfits posibles en ese estilo, el bloqueo total.
+ *  1. ancla real para invierno (bermuda/short no cuenta) -- cero outfits en
+ *     esa estación, aunque el estilo "tenga ancla" en sentido amplio.
+ *  2. abrigo de invierno -- cero outfits en esa estación con frío real.
+ *  3. abrigo de entretiempo -- cero outfits en clima templado.
+ *  4. saco de verano (solo "formal") -- cero outfits formales con calor real.
+ *  5. variedad de torso/color -- no bloquea una estación entera, pero limita
+ *     cuántas combinaciones distintas arma con lo que hay.
+ *  6. variedad de calzado -- el hueco más cosmético: todo outfit posible
+ *     termina en el mismo par. */
+export type TierHueco = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface HuecoDeCompra {
+  tier: TierHueco;
+  estilo: Estilo;
+  mensaje: string;
+  sugerida: PresetPrenda & { hsl: HSL };
+}
+
+export interface CompraPrioritaria {
+  estilo: Estilo;
+  mensaje: string;
+  sugerida: PresetPrenda & { hsl: HSL };
+}
+
+/** El hueco más severo de UN estilo puntual -- misma cadena de prioridad que
+ *  auditoriaDeGuardarropa (recommend.ts), generalizada acá para no depender
+ *  de un `clima` elegido en pantalla: auditoriaDeGuardarropa responde "qué
+ *  te falta HOY, con el clima de hoy" (por eso ancla invernal/abrigo de
+ *  invierno solo corren si el usuario eligió ese clima en "Vestite hoy")
+ *  -- pero un reporte de estadísticas/FODA pregunta algo distinto,
+ *  estructural: "¿qué le falta a tu placard en general, sea cual sea la
+ *  estación de hoy?". Por eso acá SIEMPRE se chequean las dos estaciones
+ *  (invierno y entretiempo) y no una sola: un hueco de abrigo de invierno es
+ *  real y accionable en pleno verano, aunque hoy no se note. `null` solo si
+ *  de verdad no hay ningún hueco en ninguna de las 7 capas para este
+ *  estilo. */
+function huecoDeEstilo(estilo: Estilo, placard: Prenda[], catalogo: (PresetPrenda & { hsl: HSL })[]): HuecoDeCompra | null {
+  const ancla = sugerenciaDeAncla(estilo, placard, catalogo);
+  if (ancla) return { tier: 0, estilo, ...ancla };
+
+  const anclaInvernal = sugerenciaDeAnclaInvernal(estilo, placard, catalogo);
+  if (anclaInvernal) return { tier: 1, estilo, ...anclaInvernal };
+
+  const abrigoInvierno = sugerenciaDeAbrigoInvierno(estilo, placard, catalogo);
+  if (abrigoInvierno) return { tier: 2, estilo, ...abrigoInvierno };
+
+  const abrigoEntretiempo = sugerenciaDeAbrigoEntretiempo(estilo, placard, catalogo);
+  if (abrigoEntretiempo) return { tier: 3, estilo, ...abrigoEntretiempo };
+
+  if (estilo === "formal") {
+    const saco = sugerenciaDeSacoDeVerano(placard, catalogo);
+    if (saco) return { tier: 4, estilo, ...saco };
+  }
+
+  const variedad = sugerenciaDeVariedad(estilo, placard, catalogo);
+  if (variedad) return { tier: 5, estilo, ...variedad };
+
+  const calzado = sugerenciaDeCalzado(estilo, placard, catalogo);
+  if (calzado) return { tier: 6, estilo, ...calzado };
+
+  return null;
+}
+
+/** La compra de mayor impacto de TODO el placard -- pedido explícito del
+ *  usuario: "una recomendación de compra general que surja del FODA y de
+ *  los outfits en estadísticas", actuando en múltiples roles (asesor de
+ *  imagen, sastre, experto en moda/colores/prendas, gerente ejecutivo).
+ *  Corre huecoDeEstilo sobre los 6 estilos y aplica el mismo criterio que
+ *  un gerente ejecutivo real usaría para priorizar una lista de pendientes:
+ *
+ *  1. Severidad primero (`tier`, ver su comentario): un estilo sin ancla
+ *     (cero outfits posibles) siempre gana sobre uno que solo necesita más
+ *     variedad de calzado, sea cual sea cuántos estilos afecte cada uno.
+ *  2. A igual severidad, la sugerencia que resuelve el hueco de MÁS estilos
+ *     A LA VEZ gana -- no por estar "tageada" para varios registros (ver el
+ *     comentario de compararNeutralidadColor en recommend.ts sobre por qué
+ *     ESE criterio es incorrecto para un outfit puntual), sino porque el
+ *     catálogo, evaluado independientemente para cada estilo, eligió
+ *     exactamente LA MISMA prenda (mismo id) como mejor opción para más de
+ *     uno -- un hecho verificable, no una etiqueta: comprar esa prenda de
+ *     verdad tapa más de un hueco real a la vez, el mejor "retorno" posible
+ *     de una sola compra.
+ *
+ *  Devuelve `null` solo si de verdad no hay ningún hueco en ninguno de los
+ *  6 estilos -- un placard maduro en todas las puntas no necesita que se le
+ *  invente una recomendación. */
+export function compraDeMayorImpacto(
+  placard: Prenda[],
+  catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+): CompraPrioritaria | null {
+  const huecos = ESTILOS.map((estilo) => huecoDeEstilo(estilo, placard, catalogo)).filter(
+    (h): h is HuecoDeCompra => h !== null,
+  );
+  return elegirCompraPrioritaria(huecos);
+}
+
+/** Núcleo puro de compraDeMayorImpacto, separado para que analizarFoda
+ *  pueda reusar el MISMO array de huecos que ya calculó para `oportunidades`
+ *  (ver su uso ahí) en vez de correr huecoDeEstilo sobre los 6 estilos por
+ *  segunda vez -- nunca hay riesgo de que oportunidades y compraPrioritaria
+ *  queden inconsistentes entre sí (una lista de huecos, dos lecturas). */
+function elegirCompraPrioritaria(huecos: HuecoDeCompra[]): CompraPrioritaria | null {
+  if (huecos.length === 0) return null;
+
+  const vecesPorId = new Map<string, number>();
+  for (const h of huecos) vecesPorId.set(h.sugerida.id, (vecesPorId.get(h.sugerida.id) ?? 0) + 1);
+
+  const [mejor] = [...huecos].sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier - b.tier;
+    return (vecesPorId.get(b.sugerida.id) ?? 1) - (vecesPorId.get(a.sugerida.id) ?? 1);
+  });
+
+  const otrosEstilos = huecos
+    .filter((h) => h.sugerida.id === mejor.sugerida.id && h.estilo !== mejor.estilo)
+    .map((h) => ESTILO_LABEL[h.estilo]);
+  const mensaje =
+    otrosEstilos.length > 0
+      ? `${mejor.mensaje} Esta misma compra también te resuelve un hueco en ${otrosEstilos.join(", ")} -- la de mayor impacto de todo tu placard hoy.`
+      : mejor.mensaje;
+
+  return { estilo: mejor.estilo, mensaje, sugerida: mejor.sugerida };
+}
+
 /** Lectura "de MBA" del placard vía la matriz FODA/SWOT clásica -- pedido
  *  explícito del usuario, reemplazando el "fortalezas y oportunidades de
  *  mejora" anterior. Esa versión anterior, con la mejor intención, mezclaba
@@ -325,7 +476,18 @@ export function analizarFoda(placard: Prenda[]): AnalisisFoda {
   if (totalPrendas === 0) {
     debilidades.push("Todavía no cargaste ninguna prenda -- empezá por tu placard para ver indicadores reales.");
     const { nivelSalud, veredicto } = diagnosticoGeneral(fortalezas, debilidades, amenazas, totalPrendas);
-    return { totalPrendas, variedadColores, fortalezas, debilidades, oportunidades, amenazas, nivelSalud, veredicto, estrategias: [] };
+    return {
+      totalPrendas,
+      variedadColores,
+      fortalezas,
+      debilidades,
+      oportunidades,
+      amenazas,
+      nivelSalud,
+      veredicto,
+      estrategias: [],
+      compraPrioritaria: null,
+    };
   }
 
   const piernas = placard.filter((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
@@ -367,17 +529,26 @@ export function analizarFoda(placard: Prenda[]): AnalisisFoda {
     debilidades.push(`Poca variedad de colores (solo ${variedadColores}): limita cuántas combinaciones distintas podés armar.`);
   }
 
-  // Oportunidades: por cada estilo, lo que el catálogo (CATALOGO_CON_HSL,
-  // default de las dos funciones) ofrece para cerrar un hueco real de
-  // ancla o de variedad -- nunca los dos a la vez para el mismo estilo:
-  // sugerenciaDeAncla ya devuelve null si el estilo SÍ tiene ancla, así que
-  // no compiten por el mismo hueco.
-  for (const estilo of ESTILOS) {
-    const deAncla = sugerenciaDeAncla(estilo, placard);
-    if (deAncla) oportunidades.push(deAncla.mensaje);
-    const deVariedad = sugerenciaDeVariedad(estilo, placard);
-    if (deVariedad) oportunidades.push(deVariedad.mensaje);
-  }
+  // Oportunidades: por cada estilo, el hueco de compra más severo que
+  // encuentre huecoDeEstilo (ancla > ancla invernal > abrigo de invierno >
+  // abrigo de entretiempo > saco de verano > variedad de torso/color >
+  // variedad de calzado -- ver su comentario largo más arriba) -- nunca más
+  // de uno por estilo, mismo criterio que ya regía acá (un tip claro y
+  // accionable, no una pared de advertencias).
+  //
+  // Auditoría de exigencia de Consejo (roles: sastre/experto en moda),
+  // pedido explícito del usuario ("mejora... la recomendación de compra
+  // general que surja del FODA"): antes de este ajuste, acá solo se
+  // chequeaban sugerenciaDeAncla y sugerenciaDeVariedad -- un estilo con
+  // ancla y variedad de sobra pero SIN abrigo de invierno real (o sin saco
+  // de verano, o con un solo par de calzado) no generaba NINGUNA
+  // oportunidad, aunque el motor ya supiera detectar exactamente ese hueco
+  // (lo usa auditoriaDeGuardarropa en "Vestite hoy"). El FODA quedaba
+  // ciego a huecos reales que la propia app ya sabía nombrar.
+  const huecosDeCompra = ESTILOS.map((estilo) => huecoDeEstilo(estilo, placard, CATALOGO_CON_HSL)).filter(
+    (h): h is HuecoDeCompra => h !== null,
+  );
+  for (const hueco of huecosDeCompra) oportunidades.push(hueco.mensaje);
 
   // Amenazas -- 3 riesgos de estructura, no de contenido:
   // 1. Ancla única: un registro que hoy arma outfits pero depende de UNA
@@ -410,7 +581,19 @@ export function analizarFoda(placard: Prenda[]): AnalisisFoda {
 
   const estrategias = estrategiasTows(fortalezas, debilidades, oportunidades, amenazas);
   const { nivelSalud, veredicto } = diagnosticoGeneral(fortalezas, debilidades, amenazas, totalPrendas);
-  return { totalPrendas, variedadColores, fortalezas, debilidades, oportunidades, amenazas, nivelSalud, veredicto, estrategias };
+  const compraPrioritaria = elegirCompraPrioritaria(huecosDeCompra);
+  return {
+    totalPrendas,
+    variedadColores,
+    fortalezas,
+    debilidades,
+    oportunidades,
+    amenazas,
+    nivelSalud,
+    veredicto,
+    estrategias,
+    compraPrioritaria,
+  };
 }
 
 /** Buscador libre del placard (Placard.tsx): compara contra los mismos
