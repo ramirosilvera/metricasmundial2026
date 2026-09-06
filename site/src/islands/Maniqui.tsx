@@ -96,6 +96,7 @@ const OUTER_CON_CUELLO_VISIBLE: Categoria[] = ["sweater", "buzo", "campera", "sa
 
 function agruparPorCapa(prendas: Prenda[]): {
   principal: Partial<Record<Capa, Prenda>>;
+  accesorios: Prenda[];
   cuelloSecundario?: Prenda;
   extras: Prenda[];
 } {
@@ -105,10 +106,31 @@ function agruparPorCapa(prendas: Prenda[]): {
   porCapa.torso.sort((a, b) => PRIORIDAD_TORSO.indexOf(a.categoria) - PRIORIDAD_TORSO.indexOf(b.categoria));
 
   const principal: Partial<Record<Capa, Prenda>> = {};
+  const accesorios: Prenda[] = [];
   const extras: Prenda[] = [];
   let cuelloSecundario: Prenda | undefined;
 
   (Object.keys(porCapa) as Capa[]).forEach((capa) => {
+    // Los accesorios NO compiten entre sí por un único lugar, a diferencia
+    // del resto de las capas: una corbata va al cuello y un cinturón a la
+    // cintura, son dos zonas distintas del cuerpo y en un outfit real se
+    // usan LAS DOS a la vez. Hallazgo de esta ronda ("¿cómo queda el outfit
+    // del maniquí? ¿puede quedar más similar a la realidad?"), verificado
+    // renderizando el maniquí real con un traje completo: como acá se
+    // tomaba una sola prenda por capa, el cinturón se quedaba con el lugar
+    // y la CORBATA -- la prenda más visible de un outfit formal -- se caía
+    // al renglón de chips de abajo, o sea que el traje se dibujaba sin
+    // corbata. Ahora se dibuja una por posición real (ver
+    // posicion_accesorio en types.ts, el mismo dato que ya usa
+    // AccesorioCuerpo para decidir la forma); recién una TERCERA (dos
+    // bufandas, dos cinturones) cae a los chips.
+    if (capa === "accesorio") {
+      const alCuello = porCapa.accesorio.find((p) => p.posicion_accesorio === "cuello");
+      const aLaCintura = porCapa.accesorio.find((p) => p.posicion_accesorio !== "cuello");
+      accesorios.push(...[alCuello, aLaCintura].filter((p): p is Prenda => !!p));
+      extras.push(...porCapa.accesorio.filter((p) => p !== alCuello && p !== aLaCintura));
+      return;
+    }
     let [primera, ...resto] = porCapa[capa];
     if (primera) principal[capa] = primera;
 
@@ -125,7 +147,7 @@ function agruparPorCapa(prendas: Prenda[]): {
 
     extras.push(...resto);
   });
-  return { principal, cuelloSecundario, extras };
+  return { principal, accesorios, cuelloSecundario, extras };
 }
 
 /** Relleno con volumen simple: un degradé de dos paradas (mismo matiz, más
@@ -749,8 +771,18 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
                   el trayecto, dejando un hueco real y angosto para la
                   camisa (ver el path del pecho de camisa, más abajo en este
                   archivo, que replica exactamente este mismo borde). */}
-              <path d="M46 42 L36 60 L52 96 L60 46 Z" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
-              <path d="M74 42 L84 60 L68 96 L60 46 Z" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
+              {/* 4ta revisión (esta ronda, "que el maniquí se parezca más a
+                  la realidad"): los dos bordes interiores se abrían hacia
+                  ABAJO y terminaban separados 16u justo a la altura del
+                  botón -- o sea, un saco abrochado cuyos delanteros nunca
+                  se tocan. En un saco real los delanteros se juntan en el
+                  botón: la abertura es una lente, ancha en el pecho y
+                  cerrada en el botón. Se agrega ese vértice (60,96) y el
+                  punto más ancho a media altura (52/68, 74) -- el pecho de
+                  la camisa de más abajo replica exactamente estos mismos
+                  puntos, como ya venía haciendo. */}
+              <path d="M46 42 L36 60 L60 96 L52 74 L60 46 Z" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
+              <path d="M74 42 L84 60 L60 96 L68 74 L60 46 Z" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
               {/* dos botones sobre la línea de cierre, más abajo que la 1ra
                   pasada (acompañando el largo nuevo) -- la seña visual que
                   distingue un saco abrochado de una campera con
@@ -777,7 +809,7 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
                   comentario de arriba sobre la referencia anatómica del
                   puño), no a mitad de torso. */}
               <path
-                d="M32 106 Q60 120 88 106"
+                d="M32 113 Q60 121 88 113"
                 fill="none"
                 stroke={contornoHsl(prenda.color_h, prenda.color_s, prenda.color_l)}
                 strokeWidth={1.4}
@@ -1079,7 +1111,7 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
   );
 }
 
-function AccesorioCuerpo({ prenda }: { prenda: Prenda }) {
+function AccesorioCuerpo({ prenda, cortadaEn }: { prenda: Prenda; cortadaEn?: number }) {
   // posicion_accesorio es un dato real de la prenda (ver types.ts), no una
   // regla automática por categoria -- antes de esa columna, un cinturón,
   // una corbata y una bufanda dibujaban el mismo bloque a la altura de la
@@ -1107,7 +1139,21 @@ function AccesorioCuerpo({ prenda }: { prenda: Prenda }) {
         hijos={(fill, stroke, patron) => (
           <>
             <Forma d="M57 38 L63 38 L61 46 L59 46 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
-            <Forma d="M59 46 L61 46 L65 85 L60 100 L55 85 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
+            <Forma
+              d={
+                // `cortadaEn` = el largo al que la corbata se mete detrás de
+                // otra prenda (el cierre de botón de un saco). Sin eso, la
+                // corbata sale entera por encima del saco, como si estuviera
+                // apoyada arriba en vez de puesta debajo.
+                cortadaEn === undefined
+                  ? "M59 46 L61 46 L65 85 L60 100 L55 85 Z"
+                  : `M59 46 L61 46 L64 ${cortadaEn - 6} L60 ${cortadaEn} L56 ${cortadaEn - 6} Z`
+              }
+              fill={fill}
+              stroke={stroke}
+              patron={patron}
+              sugerida={esSugerida(prenda)}
+            />
           </>
         )}
       />
@@ -1146,7 +1192,7 @@ function AccesorioCuerpo({ prenda }: { prenda: Prenda }) {
  *  PrendaIcon.tsx) -- misma fibra, misma seña visual, sea cual sea el
  *  tamaño del dibujo. */
 export default function Maniqui({ prendas }: { prendas: Prenda[] }) {
-  const { principal, cuelloSecundario, extras } = agruparPorCapa(prendas);
+  const { principal, accesorios, cuelloSecundario, extras } = agruparPorCapa(prendas);
   const neutro = "var(--border)";
   const neutroStroke = "rgba(33,26,21,0.18)";
 
@@ -1348,7 +1394,7 @@ export default function Maniqui({ prendas }: { prendas: Prenda[] }) {
                   aproximación aparte que pueda desincronizarse. */}
               {principal.torso.categoria === "saco" && (
                 <path
-                  d="M60 46 L52 96 L68 96 Z"
+                  d="M60 46 L52 74 L60 96 L68 74 Z"
                   fill={
                     cuelloSecundario.patron !== "liso" && cuelloSecundario.color2_hex
                       ? `url(#estampado-cuello-${cuelloSecundario.id})`
@@ -1379,7 +1425,18 @@ export default function Maniqui({ prendas }: { prendas: Prenda[] }) {
             </g>
           </>
         )}
-        {principal.accesorio && <AccesorioCuerpo prenda={principal.accesorio} />}
+        {accesorios.map((a) => (
+          <AccesorioCuerpo
+            key={a.id}
+            prenda={a}
+            // Con un saco puesto, la corbata desaparece detrás del cierre
+            // de botón (y=96 en TorsoCuerpo, donde se juntan los dos
+            // delanteros): un traje real no muestra la corbata por debajo
+            // del botón abrochado. Sin saco, la corbata cae hasta la
+            // cintura como corresponde.
+            cortadaEn={principal.torso?.categoria === "saco" ? 94 : undefined}
+          />
+        ))}
         {principal.pies && <PiesCuerpo prenda={principal.pies} />}
       </svg>
 
