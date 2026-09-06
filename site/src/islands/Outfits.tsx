@@ -59,10 +59,13 @@ function leyenda(prendas: Prenda[]): string {
  *  las mismas clases `.nivel-*` que ya pintan Recomendaciones.tsx/
  *  Probar.tsx (verde/naranja/amarillo) -- mismo vocabulario visual de
  *  "qué tan bien combina" en toda la app, no una paleta nueva para esta
- *  sola pantalla. Con el tope de puntuarOutfit en 8 (ver recommend.ts), el
- *  9 quedó matemáticamente inalcanzable -- en la práctica esto ya solo
- *  distingue 10 (excelente) de todo lo demás, así que el corte >=9 sigue
- *  siendo correcto aunque el "9" nunca ocurra. */
+ *  sola pantalla. Con el tope de "no todosExcelentes" en 8 (ver
+ *  PUNTOS_POR_NIVEL en recommend.ts), 9 es exclusivo del caso
+ *  "todosExcelentes, pero con un ajuste pendiente" (acento de color aislado
+ *  o piernas/torso casi idénticos -- ver `tieneAjustePendiente` en
+ *  puntuarOutfit, auditoría de exigencia de Consejo) -- ya no es un valor
+ *  inalcanzable, corta genuinamente entre "impecable con un pero" (9) y
+ *  "impecable, sin ningún pero" (10). */
 function nivelDePuntaje(puntaje: number): "excelente" | "muy_bueno" | "con_cuidado" {
   if (puntaje >= 9) return "excelente";
   if (puntaje >= 7) return "muy_bueno";
@@ -71,9 +74,11 @@ function nivelDePuntaje(puntaje: number): "excelente" | "muy_bueno" | "con_cuida
 
 /** Consejo (rol Datos/Estadística): puntuarOutfit promedia sobre solo 3
  *  niveles por par (10/6/3), así que aunque el número interno vaya de 1 a
- *  10, en la práctica el placard real del usuario nunca generó más de 4
- *  valores distintos (6, 7, 8, 10) -- una escala de "10 puntos" es
- *  precisión falsa. Consejo (rol UX): un número exacto invita a discutir
+ *  10, en la práctica el placard real del usuario nunca generó más de 5
+ *  valores distintos (6, 7, 8, 9, 10 -- el 9 sumado en la auditoría de
+ *  exigencia de Consejo, ver `tieneAjustePendiente` en puntuarOutfit) --
+ *  una escala de "10 puntos" sigue siendo precisión falsa. Consejo (rol
+ *  UX): un número exacto invita a discutir
  *  el número ("¿por qué 8 y no 9?"), mientras que las estrellas se leen
  *  como una señal cualitativa. Por eso esto es SOLO una capa de
  *  presentación: el motor sigue puntuando 1-10 puertas adentro (ordena el
@@ -89,10 +94,15 @@ function estrellasDePuntaje(puntaje: number): number {
 }
 
 // s.puntaje === 10 es la ÚNICA forma de llegar a ese número en puntuarOutfit
-// (ver recommend.ts: "todosExcelentes ? 10 : ..."), así que este chequeo es
-// exactamente "todos los pares del outfit son excelente", sin numerología --
-// y con estrellasDePuntaje ya en piso (floor(10/2)=5) es siempre 5 estrellas
-// completas, nunca una aproximación.
+// (ver recommend.ts: "todosExcelentes ? (tieneAjustePendiente ? 9 : 10) :
+// ..."), así que este chequeo exige, sin numerología, tanto "todos los pares
+// del outfit son excelente" COMO "sin ningún acento aislado ni piernas/torso
+// casi idénticos pendiente" -- auditoría de exigencia de Consejo: antes de
+// esa ronda esos dos ajustes eran puramente informativos y un 9 nunca
+// ocurría; ahora "Vestite hoy" reserva la tarjeta de 5 estrellas para la
+// combinación genuinamente sin ningún "pero", y una con un ajuste pendiente
+// queda en 9 -- 4 estrellas (ver estrellasDePuntaje), visible en otras
+// pantallas pero ya no ofrecida acá como si fuera indiscutible.
 function esExcelente(s: OutfitSugerido): boolean {
   return s.puntaje === 10;
 }

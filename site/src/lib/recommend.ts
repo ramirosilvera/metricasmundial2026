@@ -1333,9 +1333,17 @@ export interface PuntajeOutfit {
    *  comparaciones que ya arma/valida armarOutfitsSugeridos (torso-ancla,
    *  calzado-ancla, accesorio-ancla, calzado-torso, accesorio-torso,
    *  accesorio-calzado), reusado acá en vez de inventar una escala aparte.
-   *  10 es exclusivo de "todos los pares excelente" -- el redondeo nunca
-   *  sube a 10 con un par por debajo, aunque el promedio dé 9.5+ (ver el
-   *  comentario en el cuerpo de la función). */
+   *  10 es exclusivo de "todos los pares excelente Y sin ningún ajuste
+   *  pendiente" -- ni el redondeo sube a 10 con un par por debajo (aunque
+   *  el promedio dé 9.5+), ni "todos los pares excelente" alcanza si el
+   *  outfit tiene un acento de color aislado o piernas/torso casi
+   *  idénticos (ver `tieneAjustePendiente` en el cuerpo de la función:
+   *  Consejo, auditoría de exigencia -- pedido explícito del usuario, "que
+   *  sea realmente exigente... que cuando haga una combinación sea buena y
+   *  sea indiscutible"). 9 es exactamente eso: matemáticamente impecable
+   *  en color de a pares, pero con un detalle de refinamiento real que la
+   *  propia `explicacion` nombra -- ya no queda escondido detrás de un
+   *  "10/10 sin nada que ajustar" que se contradice a sí mismo. */
   puntaje: number;
   /** Motivo ejecutivo, 1-2 oraciones: por qué no es (o si es) un 10. No
    *  repite el registro (Formal/Casual/...) -- eso ya lo muestra
@@ -1440,14 +1448,21 @@ export function contarColoresProtagonistas(prendas: Prenda[]): number {
  *  porque, a diferencia de una prenda grande, no tiene superficie propia
  *  para leerse como protagonista intencional por sí sola.
  *
- *  Puramente informativo -- NO cambia el puntaje (ver su único uso en
- *  puntuarOutfit, reemplazando solo el mensaje genérico de "nada que
- *  ajustar"): un acento sin eco no es un error de color (nada choca en el
- *  sentido de scoreColor), es una oportunidad de refinamiento real, y
- *  penalizar el puntaje por esto generaría falsos negativos masivos --
- *  la gran mayoría de la ropa real no tiene un accesorio calzado a tono
- *  para cada color de zapatilla, y esa combinación simple sigue siendo
- *  perfectamente válida sin él. */
+ *  Hasta la auditoría de exigencia de Consejo, esto era puramente
+ *  informativo (solo reemplazaba el mensaje genérico de "nada que ajustar"
+ *  en puntuarOutfit, sin tocar el número): un acento sin eco no es un error
+ *  de color (nada choca en el sentido de scoreColor), es una oportunidad de
+ *  refinamiento real -- y penalizar CON UN BLOQUEO real (bajarlo a
+ *  "muy_bueno"/con_cuidado) hubiera generado falsos negativos masivos, ya
+ *  que la gran mayoría de la ropa real no tiene un accesorio a tono para
+ *  cada color de zapatilla, y esa combinación simple sigue siendo
+ *  perfectamente válida sin él -- ESO no cambió. Lo que sí cambió (pedido
+ *  explícito del usuario: "que sea realmente exigente... que cuando haga
+ *  una combinación sea buena y sea indiscutible") es que ya no alcanza el
+ *  10 limpio: puntuarOutfit ahora topea en 9 cuando esto dispara (ver
+ *  `tieneAjustePendiente` ahí), reservando el 10 para la combinación sin
+ *  ningún refinamiento pendiente. Sigue siendo un peldaño, no un choque --
+ *  9 sigue siendo "excelente", nunca "muy_bueno" ni "con_cuidado". */
 export function acentoDeColorAislado(prendas: Prenda[]): Prenda | null {
   if (prendas.length < 3) return null;
   const candidatos = prendas.filter(
@@ -1485,10 +1500,30 @@ export function acentoDeColorAislado(prendas: Prenda[]): Prenda | null {
  *  regla 3 de scoreColor por construcción (un neutro de por medio siempre
  *  cae en la regla 1, nunca en la 3): un pantalón negro + buzo negro es un
  *  monocromo neutro normal y esperado, no el riesgo real que describe el
- *  usuario (que fue justo sobre dos beige, un color con matiz real). */
+ *  usuario (que fue justo sobre dos beige, un color con matiz real).
+ *
+ *  Excluye "saco" del lado torso -- hallazgo real de la auditoría de
+ *  exigencia de Consejo (rol: sastre), encontrado al hacer que esta función
+ *  empezara a afectar el puntaje (antes era puramente informativa, así que
+ *  este falso positivo nunca se notaba en el número): un traje real
+ *  (pantalón de vestir + saco) se compra y se usa EN EL MISMO TONO EXACTO a
+ *  propósito -- es la definición misma de "traje", no un accidente de
+ *  placard. Verificado por ejecución contra el catálogo real:
+ *  pantalon-vestir-azul y saco-azul-marino son el mismo #1F2A44 exacto, así
+ *  que sin esta exclusión un traje azul marino perfecto -- el ejemplo de
+ *  sastrería clásica que ya motivó la regla 4 de scoreColor más arriba --
+ *  quedaba degradado a 9/10 con un aviso de "puede quedar plano", el tipo
+ *  exacto de combinación "indiscutible" que un sastre real jamás
+ *  cuestionaría. La estructura del saco (solapas, botonadura, bolsillos)
+ *  además rompe cualquier lectura de "bloque plano" por sí sola, a
+ *  diferencia de un buzo/sweater/remera/campera sin esa construcción --
+ *  así que la exclusión no es solo "para que pase el test", describe una
+ *  diferencia real de prenda. camisa/remera/buzo/sweater/campera (el resto
+ *  de CATEGORIAS_TORSO) siguen expuestas a esta regla sin cambios: ninguna
+ *  de ellas tiene la misma convención ni la misma estructura. */
 export function torsoYPiernasCasiIdenticos(prendas: Prenda[]): { piernas: Prenda; torso: Prenda } | null {
   const piernas = prendas.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
-  const torso = prendas.find((p) => CATEGORIAS_TORSO.includes(p.categoria));
+  const torso = prendas.find((p) => CATEGORIAS_TORSO.includes(p.categoria) && p.categoria !== "saco");
   if (!piernas || !torso) return null;
   if (esNeutro(piernas.color_s, piernas.color_l) || esNeutro(torso.color_s, torso.color_l)) return null;
   const hd = hueDist(piernas.color_h, torso.color_h);
@@ -1565,7 +1600,34 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
   // muy_bueno ahora promedia (5*10+6)/6=9.33 -> redondea a 9 -> topeado a 8.
   const todosExcelentes = pares.every((p) => p.score.nivel === "excelente");
   const promedio = pares.reduce((acc, p) => acc + PUNTOS_POR_NIVEL[p.score.nivel], 0) / pares.length;
-  const puntaje = todosExcelentes ? 10 : Math.max(1, Math.min(8, Math.round(promedio)));
+
+  // Acento aislado y piernas/torso casi idénticos (ver acentoDeColorAislado
+  // y torsoYPiernasCasiIdenticos más arriba) -- calculados ACÁ, antes del
+  // puntaje, no más abajo junto al resto de la explicación: hasta esta
+  // ronda eran "puramente informativos" (solo texto, nunca el número), a
+  // pedido explícito del usuario de subir la exigencia del sistema de
+  // puntuación ("estoy notando que hay muchas combinaciones... algunas
+  // tienen como aclaraciones o asteriscos que terminan bajando la vara...
+  // que cuando haga una combinación sea buena y sea indiscutible"). Un
+  // "10/10, sin nada que ajustar" al lado de una explicación que dice "pero
+  // es el único toque de ese tono" o "podría quedar plano" es exactamente
+  // esa contradicción -- el mismo argumento, verificado en la auditoría de
+  // Consejo de esta ronda, que ya motivó bajar `muy_bueno` de 7 a 6 y topar
+  // "no todosExcelentes" en 8 en vez de 9 (ver el comentario de
+  // PUNTOS_POR_NIVEL): un defecto real no debe leerse como "casi perfecto".
+  // Acá el defecto es más chico (nada choca, es una oportunidad de
+  // refinamiento, no un error de color) -- por eso el piso es 9, no 8 --
+  // pero sigue siendo un defecto real, con usos y costumbres de sastrería/
+  // asesoría de imagen de por medio, así que un 10 limpio (sin ningún "pero")
+  // tiene que valer más que un 10 con nota al pie.
+  const acentoAislado = acentoDeColorAislado(prendas);
+  const piernasTorsoIdenticos = torsoYPiernasCasiIdenticos(prendas);
+  const tieneAjustePendiente = !!acentoAislado || !!piernasTorsoIdenticos;
+  const puntaje = todosExcelentes
+    ? tieneAjustePendiente
+      ? 9
+      : 10
+    : Math.max(1, Math.min(8, Math.round(promedio)));
 
   // Regla universal 60-30-10 (ver contarColoresProtagonistas) -- pensada
   // para MEJORAR LA EXPLICACIÓN, no el número: matemáticamente, con las
@@ -1583,22 +1645,6 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
   // nombrar la causa real y completa (demasiados colores compitiendo a la
   // vez, ninguno domina) -- el diagnóstico que de verdad describe 60-30-10.
   const demasiadosColores = contarColoresProtagonistas(prendas) >= 4;
-
-  // Acento aislado (ver acentoDeColorAislado más arriba) -- pedido
-  // explícito del usuario, con caso real propio ("las zapatillas azul
-  // marino con jean y remera beige... me hace ruido... un cinturón azul
-  // marino uniría perfectamente los zapatos con el conjunto"). Igual que
-  // demasiadosColores, es un ajuste de EXPLICACIÓN, no de puntaje -- ver el
-  // comentario largo de la función sobre por qué esto es una sugerencia de
-  // refinamiento, no un error de color real.
-  const acentoAislado = acentoDeColorAislado(prendas);
-
-  // Piernas y torso casi idénticos (ver torsoYPiernasCasiIdenticos más
-  // arriba) -- pedido explícito del usuario, con caso real propio ("jean
-  // beige + buzo con capucha beige... revisaría que no sean exactamente el
-  // mismo tono y textura"). Mismo criterio de "ajuste de explicación, no de
-  // puntaje" que acentoAislado -- sigue siendo un tono-sobre-tono válido.
-  const piernasTorsoIdenticos = torsoYPiernasCasiIdenticos(prendas);
 
   // el par que más pesa en contra -- el de nivel más bajo (con_cuidado
   // antes que muy_bueno); a igualdad de nivel, el primero en orden de
@@ -1625,25 +1671,29 @@ export function puntuarOutfit(prendas: Prenda[], estilo?: Estilo): PuntajeOutfit
     explicacion =
       "Hay 4 o más colores saturados compitiendo a la vez, sin que ninguno mande -- la regla 60-30-10 (un color principal, uno secundario y el resto como acento) ayuda a que no se vea disperso.";
   } else if (todosExcelentes) {
-    // contrasteMarcado primero (antes que tono sobre tono): pedido
-    // explícito del usuario, es la lectura más específica e interesante
-    // cuando aplica -- ver la regla 1c de scoreColor. piernasTorsoIdenticos
-    // se chequea INDEPENDIENTE de tieneToneSobreTono (no anidado adentro),
-    // no como un caso particular de él -- hallazgo real de esta ronda: para
-    // colores apagados/tierra (el caso real reportado, dos beige) la regla
-    // 2 de scoreColor (análogo + croma bajo) siempre gana antes de llegar a
-    // la regla 3 (la que pone el tag "tono_sobre_tono"), así que un par
-    // piernas+torso muy apagado y casi idéntico NUNCA lleva ese tag -- si
-    // este chequeo quedaba anidado adentro de tieneToneSobreTono, nunca
-    // disparaba para el caso real que lo motivó (jean beige + buzo beige).
-    explicacion = contrasteMarcado
-      ? "Contraste marcado y prolijo: la alternancia de tonos oscuros y claros define bien el outfit."
-      : piernasTorsoIdenticos
-        ? `Tono sobre tono en la base del outfit: ${CATEGORIA_LABEL[piernasTorsoIdenticos.piernas.categoria]} y ${CATEGORIA_LABEL[piernasTorsoIdenticos.torso.categoria]} son prácticamente el mismo color -- funciona bien, pero si además comparten exactamente la misma textura puede quedar plano arriba/abajo; una pequeña diferencia de tono, luminosidad o textura entre los dos ayuda.`
-        : tieneToneSobreTono
-          ? "Combinación segura: tono sobre tono en la base del outfit."
-          : acentoAislado
-            ? `El color combina bien, pero ${CATEGORIA_LABEL[acentoAislado.categoria]} es el único toque de ese tono en el conjunto -- un accesorio o cinturón a tono lo ataría mejor.`
+    // Orden cambiado en la auditoría de exigencia de Consejo: ahora que
+    // piernasTorsoIdenticos y acentoAislado bajan el puntaje a 9 (ver
+    // `tieneAjustePendiente` más arriba), van PRIMERO -- la explicación
+    // tiene que nombrar la razón real de por qué esto NO es un 10 antes que
+    // cualquier lectura puramente positiva (contrasteMarcado/tono sobre
+    // tono), que solo aplica cuando de verdad no hay ningún "pero" pendiente.
+    // piernasTorsoIdenticos se chequea INDEPENDIENTE de tieneToneSobreTono
+    // (no anidado adentro), no como un caso particular de él -- hallazgo
+    // real de una ronda anterior: para colores apagados/tierra (el caso
+    // real reportado, dos beige) la regla 2 de scoreColor (análogo + croma
+    // bajo) siempre gana antes de llegar a la regla 3 (la que pone el tag
+    // "tono_sobre_tono"), así que un par piernas+torso muy apagado y casi
+    // idéntico NUNCA lleva ese tag -- si este chequeo quedara anidado
+    // adentro de tieneToneSobreTono, nunca dispararía para el caso real que
+    // lo motivó (jean beige + buzo beige).
+    explicacion = piernasTorsoIdenticos
+      ? `Tono sobre tono en la base del outfit: ${CATEGORIA_LABEL[piernasTorsoIdenticos.piernas.categoria]} y ${CATEGORIA_LABEL[piernasTorsoIdenticos.torso.categoria]} son prácticamente el mismo color -- funciona, pero si además comparten exactamente la misma textura puede quedar plano arriba/abajo; una pequeña diferencia de tono, luminosidad o textura entre los dos lo lleva de 9 a un 10 limpio.`
+      : acentoAislado
+        ? `El color combina bien, pero ${CATEGORIA_LABEL[acentoAislado.categoria]} es el único toque de ese tono en el conjunto -- un accesorio o cinturón a tono lo ataría mejor y lo lleva de 9 a un 10 limpio.`
+        : contrasteMarcado
+          ? "Contraste marcado y prolijo: la alternancia de tonos oscuros y claros define bien el outfit."
+          : tieneToneSobreTono
+            ? "Combinación segura: tono sobre tono en la base del outfit."
             : "Combinación segura en color, sin nada que ajustar.";
   } else {
     // al menos un par en muy_bueno: cita el motivo real y puntual (ya es

@@ -3969,12 +3969,17 @@ describe("puntuarOutfit", () => {
   // Consejo, auditoría integral del motor de color, caso real propio del
   // usuario: "zapatos azul marino + remera beige + pantalón beige... me
   // hace ruido... un cinturón azul marino uniría perfectamente los zapatos
-  // con el conjunto". Cada par por separado ya daba "excelente" (ver
-  // acentoDeColorAislado más arriba) -- el puntaje sigue en 10 (nada choca
-  // de verdad), pero la explicación ahora nombra el refinamiento real en
-  // vez de decir "sin nada que ajustar" sobre un acento que sí se puede
-  // mejorar.
-  it("acento aislado (calzado/accesorio sin eco) -> sigue en 10/10, pero la explicación sugiere anclarlo en vez de 'nada que ajustar'", () => {
+  // con el conjunto". Cada par por separado ya da "excelente" -- nada
+  // choca de verdad -- pero desde la auditoría de exigencia de Consejo
+  // (pedido explícito del usuario: "que sea realmente exigente... que
+  // cuando haga una combinación sea buena y sea indiscutible") esto ya NO
+  // alcanza un 10 limpio: un acento sin eco es un refinamiento real
+  // pendiente, y un "10/10, sin nada que ajustar" al lado de "pero es el
+  // único toque de ese tono" era justo la clase de asterisco que bajaba la
+  // vara sin que el número lo reflejara. Tope en 9, no en 8: sigue sin ser
+  // un error de color (ningún par choca), solo un peldaño por debajo de la
+  // combinación sin ningún "pero".
+  it("acento aislado (calzado/accesorio sin eco) -> topea en 9/10 (no 10 limpio), la explicación sugiere anclarlo", () => {
     // remera GRIS (neutro), no beige como el pantalón -- a propósito, para
     // que este test quede aislado del chequeo de piernasTorsoIdenticos (ver
     // el describe de más abajo): acá lo único que se quiere probar es el
@@ -3984,11 +3989,11 @@ describe("puntuarOutfit", () => {
     const remera = mkPrenda("remera", "#8C8C8C", 0, 0, 55);
     const zapato = mkPrenda("calzado", "#1F2A44", 222, 37, 19);
     const r = puntuarOutfit([pantalon, remera, zapato]);
-    expect(r.puntaje).toBe(10);
+    expect(r.puntaje).toBe(9);
     expect(r.explicacion).toContain("único toque de ese tono");
   });
 
-  it("mismo caso, pero con un cinturón que repite el marino -- ya no queda aislado, vuelve al mensaje genérico", () => {
+  it("mismo caso, pero con un cinturón que repite el marino -- ya no queda aislado, vuelve a 10/10 con el mensaje genérico", () => {
     const pantalon = mkPrenda("pantalon", "#D8C7A1", 40, 30, 70);
     const remera = mkPrenda("remera", "#8C8C8C", 0, 0, 55);
     const zapato = mkPrenda("calzado", "#1F2A44", 222, 37, 19);
@@ -4091,6 +4096,21 @@ describe("torsoYPiernasCasiIdenticos", () => {
     expect(torsoYPiernasCasiIdenticos([buzo, zapatillas])).toBeNull();
   });
 
+  // Auditoría de exigencia de Consejo (rol: sastre), hallada al hacer que
+  // esta función empezara a afectar el puntaje: un traje real (pantalón +
+  // saco) se compra y se usa en el mismo tono exacto A PROPÓSITO -- es la
+  // definición de "traje", no el riesgo de "silueta plana" que sí aplica a
+  // un buzo/sweater/remera/campera del mismo color que el pantalón. Sin
+  // esta excepción, el ejemplo de sastrería clásica más citado del motor
+  // (traje azul marino, ver el describe de scoreColor más abajo) se leería
+  // como un defecto.
+  it("saco del mismo tono exacto que el pantalón (traje) -> null, es la convención, no un riesgo de silueta plana", () => {
+    const pantalon = mkPrenda("pantalon", "#1F2A44", 222, 37, 19);
+    const saco = mkPrenda("saco", "#1F2A44", 222, 37, 19);
+    const camisa = mkPrenda("camisa", "#B7D2EC", 205, 55, 82);
+    expect(torsoYPiernasCasiIdenticos([pantalon, saco, camisa])).toBeNull();
+  });
+
   // Integración con puntuarOutfit -- el caso exacto reportado por el
   // usuario ("jean beige + buzo con capucha beige + zapatillas urbanas
   // negras"). Hallazgo real de esta ronda: para colores apagados (como
@@ -4099,12 +4119,17 @@ describe("torsoYPiernasCasiIdenticos", () => {
   // tiene que vivir INDEPENDIENTE de `tieneToneSobreTono` en puntuarOutfit
   // -- si quedara anidado adentro, nunca disparaba para este caso real
   // (verificado escribiendo este test y viéndolo fallar antes del fix).
-  it("jean beige + buzo beige + zapatillas negras -> 10/10, con el aviso de posible planitud en la explicación", () => {
+  //
+  // 10 -> 9: auditoría de exigencia de Consejo, mismo criterio que el
+  // acento aislado de más arriba -- el riesgo real de "silueta plana" que
+  // la propia explicación nombra ya no convive con un 10/10 "sin nada que
+  // ajustar".
+  it("jean beige + buzo beige + zapatillas negras -> topea en 9/10 (no 10 limpio), con el aviso de posible planitud", () => {
     const jean = mkPrenda("pantalon", "#D8C7A1", 40, 30, 70);
     const buzo = mkPrenda("buzo", "#D8C7A1", 40, 30, 70);
     const zapatillas = mkPrenda("calzado", "#1A1A1A", 0, 0, 10);
     const r = puntuarOutfit([jean, buzo, zapatillas]);
-    expect(r.puntaje).toBe(10);
+    expect(r.puntaje).toBe(9);
     expect(r.explicacion).toContain("pantalon y buzo son prácticamente el mismo color");
     expect(r.explicacion).toContain("puede quedar plano");
   });
