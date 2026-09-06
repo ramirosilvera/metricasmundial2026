@@ -271,7 +271,12 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
   // Superstar) es un diseño de calle/lifestyle, no de zapatilla técnica de
   // entrenamiento, por eso urbano != deportivo acá (ver el comentario largo
   // de CorteCalzado en types.ts).
-  it("cada registro usa el arquetipo real que le corresponde", () => {
+  // `some` y no `every` desde la ronda de completitud del catálogo: el
+  // botín (ver CorteCalzado en types.ts) es un segundo arquetipo
+  // legítimo de los registros clásico y urbano -- un guardarropa real
+  // tiene mocasines Y botines, no uno solo por registro. Lo que sigue
+  // siendo un invariante es que el arquetipo de cada registro ESTÉ.
+  it("cada registro tiene presente el arquetipo real que le corresponde", () => {
     const mapeo: Record<string, CorteCalzado> = {
       urbano: "zapatilla_urbana",
       deportivo: "zapatilla_running",
@@ -282,7 +287,7 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
     for (const [estilo, corte] of Object.entries(mapeo)) {
       const deEseEstilo = calzado.filter((p) => p.estilo === estilo);
       expect(deEseEstilo.length, estilo).toBeGreaterThan(0);
-      expect(deEseEstilo.every((p) => p.corteCalzado === corte), estilo).toBe(true);
+      expect(deEseEstilo.some((p) => p.corteCalzado === corte), estilo).toBe(true);
     }
   });
 
@@ -294,5 +299,26 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
     const lona = calzado.filter((p) => p.corteCalzado === "zapatilla_lona");
     expect(lona.length).toBeGreaterThan(0);
     expect(lona.every((p) => p.textura !== "cuero_liso")).toBe(true);
+  });
+
+  // Ronda de completitud del catálogo, revisada como modista y asesor de
+  // imagen: los cinco cortes anteriores son TODOS calzado bajo, así que un
+  // placard armado con este catálogo no tenía con qué vestirse los pies en
+  // invierno -- en una app que separa invierno/entretiempo/verano en todas
+  // las demás categorías de abrigo.
+  it("hay botines de cuero (el único calzado de caña alta) en registro clásico y urbano", () => {
+    const botines = calzado.filter((p) => p.corteCalzado === "botin");
+    expect(botines.length).toBeGreaterThan(0);
+    expect(botines.every((p) => p.textura === "cuero_liso")).toBe(true);
+    const registros = botines.flatMap((p) => [p.estilo, ...(p.estilosSecundarios ?? [])]);
+    expect(registros).toContain("clasico");
+    expect(registros).toContain("urbano");
+  });
+
+  // Sin estacion a propósito: un botín se usa de otoño a primavera, no solo
+  // con frío extremo -- tagearlo "invierno" lo sacaría de todos los outfits
+  // de entretiempo, que es justo cuando más se usa.
+  it("ningún calzado fuerza `estacion` -- tampoco el botín", () => {
+    expect(calzado.every((p) => !p.estacion)).toBe(true);
   });
 });

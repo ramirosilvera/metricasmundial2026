@@ -96,9 +96,24 @@ export type Patron = "liso" | "rayas" | "cuadros";
  *    cuerpo (blanco/crema, sin importar el color de la lona) + costura
  *    lateral marcada -- el detalle real de una zapatilla de lona tipo
  *    Converse/Vans, suela chata (no la suela alta de la running).
+ *  - "botin" (clasico/urbano): la CAÑA por encima del tobillo -- el único
+ *    corte de esta lista que cambia la silueta y no solo la decoración, y
+ *    por eso el más reconocible de todos. Agregado en la ronda de
+ *    completitud del catálogo (pedido explícito del usuario: "revisá todas
+ *    las prendas del catálogo, decime si está completo o se puede
+ *    completar aún más"), revisado como modista y asesor de imagen: era el
+ *    hueco más grande que tenía el catálogo. Los otros cinco cortes son
+ *    todos calzado bajo, así que un placard armado con este catálogo NO
+ *    tenía con qué vestirse los pies en invierno, en una app que modela
+ *    invierno/entretiempo/verano en todo el resto de las categorías. El
+ *    botín (chelsea/chukka/borcego de cuero) es el calzado de otoño-
+ *    invierno por defecto de un guardarropa real de hombre, y funciona
+ *    tanto en registro clásico (con chino o pantalón de pana) como urbano
+ *    (con jean). Sin `estacion` cargada, igual que el resto del calzado:
+ *    un botín se usa de otoño a primavera, no solo con frío extremo.
  *  Default "zapatilla_urbana": preserva el dibujo de todo el catálogo
  *  anterior (100% zapatillas urbanas hasta esta revisión). */
-export type CorteCalzado = "zapatilla_urbana" | "zapatilla_running" | "zapato_vestir" | "mocasin" | "zapatilla_lona";
+export type CorteCalzado = "zapatilla_urbana" | "zapatilla_running" | "zapato_vestir" | "mocasin" | "zapatilla_lona" | "botin";
 
 /** Calce/silueta real de la prenda -- auditoría de sastrería (Consejo,
  *  ronda de auditoría del motor): tercer eje de un conjunto, después del

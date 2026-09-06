@@ -860,6 +860,65 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     ocasion: "casual",
     corteCalzado: "mocasin",
   },
+  // --- Botines de cuero -- ronda de completitud del catálogo (pedido
+  // explícito del usuario: "revisá todas las prendas del catálogo, quiero
+  // que me digas si está completo o se puede completar aún más"), revisado
+  // como modista y asesor de imagen. Era el hueco MÁS GRANDE que tenía el
+  // catálogo: los cinco cortes de calzado que existían (zapatilla urbana,
+  // running, zapato de vestir, mocasín, zapatilla de lona) son todos
+  // calzado BAJO, así que un placard armado con este catálogo no tenía con
+  // qué vestirse los pies en invierno -- en una app que separa invierno,
+  // entretiempo y verano en todas las demás categorías de abrigo.
+  //
+  // Marrón primero: el botín de cuero marrón es el más versátil de los dos
+  // en un guardarropa real (va con jean, chino, pana y pantalón de
+  // gabardina), y encima el catálogo ya tiene toda la familia de marrones
+  // que lo acompañan (cinturón, mocasines, pana). Mismos hex que ya usan
+  // mocasines-marrones (#5C3A21) y zapatillas-marrones (#6F4E37) --
+  // consistencia de paleta, y dos marrones reales distintos de botín (uno
+  // oscuro tipo borcego, uno más claro tipo chukka/camel).
+  //
+  // Sin `estacion`, igual que el resto del calzado: un botín se usa de
+  // otoño a primavera, no solo con frío extremo -- tagearlo "invierno" lo
+  // sacaría de todos los outfits de entretiempo, que es justo cuando más
+  // se usa.
+  {
+    id: "botines-cuero-marron",
+    nombre: "Botines de cuero marrones",
+    categoria: "calzado",
+    colorHex: "#5C3A21",
+    textura: "cuero_liso",
+    estilo: "clasico",
+    estilosSecundarios: ["casual", "urbano"],
+    ocasion: "casual",
+    corteCalzado: "botin",
+  },
+  {
+    id: "botines-cuero-camel",
+    nombre: "Botines de cuero camel",
+    categoria: "calzado",
+    colorHex: "#6F4E37",
+    textura: "cuero_liso",
+    estilo: "clasico",
+    estilosSecundarios: ["casual", "urbano"],
+    ocasion: "casual",
+    corteCalzado: "botin",
+  },
+  // negro -- el otro botín real del guardarropa: más urbano que clásico
+  // (con jean negro y campera de cuero es el look de calle por excelencia),
+  // por eso estilo "urbano" con "clasico" de secundario, al revés que los
+  // marrones de acá arriba.
+  {
+    id: "botines-cuero-negros",
+    nombre: "Botines de cuero negros",
+    categoria: "calzado",
+    colorHex: "#1C1210",
+    textura: "cuero_liso",
+    estilo: "urbano",
+    estilosSecundarios: ["clasico", "casual"],
+    ocasion: "casual",
+    corteCalzado: "botin",
+  },
   // zapatillas de lona -- registro casual, el otro hueco real del catálogo.
   // Los 3 colores clásicos de una zapatilla de lona real (blanco/negro/
   // azul marino), sin textura "cuero_liso" (es lona/textil, no cuero) --

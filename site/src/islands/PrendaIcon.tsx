@@ -725,7 +725,15 @@ export function PrendaShape({
       forma = <FormaConTextura d="M18 6 H46 L44 34 H34 L32 24 L30 34 H20 Z" fill={color} stroke={stroke} patron={patron} />;
       break;
     case "calzado": {
-      const d = "M8 44 Q8 36 18 34 L34 30 Q40 24 48 26 L52 34 Q58 36 58 44 Q58 50 52 50 L12 50 Q8 50 8 44 Z";
+      // El botín es el único corte que cambia la SILUETA y no solo la
+      // decoración (ver CorteCalzado en types.ts): la caña por encima del
+      // tobillo. Misma puntera y misma suela que el resto -- es el mismo
+      // pie -- pero atrás, donde los demás cortes bajan al talón (y=26-34),
+      // acá sube una caña hasta y=10.
+      const d =
+        corteCalzado === "botin"
+          ? "M8 44 Q8 36 18 34 L34 30 Q40 26 44 26 L44 10 L58 10 L58 44 Q58 50 52 50 L12 50 Q8 50 8 44 Z"
+          : "M8 44 Q8 36 18 34 L34 30 Q40 24 48 26 L52 34 Q58 36 58 44 Q58 50 52 50 L12 50 Q8 50 8 44 Z";
       const base = <FormaConTextura d={d} fill={color} stroke={stroke} patron={patron} />;
       // Suela de contraste: se recorta el mismo silueta con un clip
       // rectangular en la franja inferior -- así el borde de la suela sigue
@@ -789,6 +797,21 @@ export function PrendaShape({
             <>
               <path d="M39 25 Q47 24 52 34 Q54 38 50 39 Q43 33 37 30 Z" fill="#F2F0EA" stroke={stroke} />
               <line x1="9" y1="41" x2="57" y2="41" stroke={stroke} strokeWidth={0.6} />
+            </>
+          );
+          break;
+        case "botin":
+          // caña con cordonera: los ganchos/ojales que suben por la caña
+          // son la decoración real de un botín acordonado, y la costura
+          // horizontal marca dónde termina el empeine y arranca la caña
+          // (la línea que un botín chelsea resuelve con el elástico y uno
+          // acordonado con la lengüeta -- a esta escala, la misma seña).
+          decoracion = (
+            <>
+              <line x1="45" y1="28" x2="57" y2="28" stroke={tonoDetalle} strokeWidth={0.8} />
+              {[14, 19, 24].map((y) => (
+                <line key={y} x1="46.5" y1={y} x2="55.5" y2={y} stroke={tonoDetalle} strokeWidth={1} strokeLinecap="round" />
+              ))}
             </>
           );
           break;

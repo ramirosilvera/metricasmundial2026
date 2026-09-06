@@ -1005,6 +1005,18 @@ function DecoracionCalzado({
           <line x1={mx(37)} y1="233" x2={mx(55)} y2="233" stroke={stroke} strokeWidth={0.4} />
         </>
       );
+    case "botin":
+      // caña: la costura donde termina el empeine + los ganchos de la
+      // cordonera subiendo por encima del tobillo (ver CorteCalzado en
+      // types.ts y el mismo detalle en PrendaIcon.tsx).
+      return (
+        <>
+          <line x1={mx(37)} y1="226" x2={mx(55)} y2="226" stroke={stroke} strokeWidth={0.5} />
+          {[218, 222].map((y) => (
+            <line key={y} x1={mx(41)} y1={y} x2={mx(51)} y2={y} stroke={tono} strokeWidth={0.8} strokeLinecap="round" />
+          ))}
+        </>
+      );
     case "zapatilla_urbana":
     default:
       // 3 rayas laterales -- la referencia real más citada de "zapatilla
@@ -1038,6 +1050,23 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
   // vestir, con cordones más discretos en la vida real pero cordones al
   // fin).
   const conCordones = prenda.corte_calzado !== "mocasin";
+  // El botín es el único corte que cambia la SILUETA y no solo la
+  // decoración (ver CorteCalzado en types.ts): la caña arranca donde los
+  // demás cortes ya terminaron (y=223) y sube por encima del tobillo. Se
+  // dibuja sobre el ruedo del pantalón, que es exactamente como se ve un
+  // botín real usado con el pantalón por fuera. Los cordones y la
+  // decoración se corren con ella.
+  const esBotin = prenda.corte_calzado === "botin";
+  const yCana = esBotin ? 212 : 223;
+  // la caña además AFINA hacia arriba (arranca en 41-51 y se abre a 36-56
+  // recién a la altura del pie): un botín real es más angosto en el tobillo
+  // que en la parte más ancha del pie, sin eso la silueta sale como un
+  // bloque parejo, más balde que bota.
+  const xCana = esBotin ? { izqA: 41, izqB: 51, derA: 79, derB: 69 } : { izqA: 40, izqB: 52, derA: 80, derB: 68 };
+  const yApertura = yCana + (esBotin ? 11 : 1);
+  const pieIzq = `M${xCana.izqA} ${yCana} Q36 ${yApertura} 36 231 Q36 238 46 239 Q56 238 56 231 Q56 ${yApertura} ${xCana.izqB} ${yCana} Z`;
+  const pieDer = `M${xCana.derA} ${yCana} Q84 ${yApertura} 84 231 Q84 238 74 239 Q64 238 64 231 Q64 ${yApertura} ${xCana.derB} ${yCana} Z`;
+  const yCordon = esBotin ? 230 : 226;
   return (
     <Volumen
       prenda={prenda}
@@ -1069,7 +1098,7 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
               detalle de ojales -- esto sigue siendo una ilustración
               esquemática, no un dibujo técnico de calzado) para que se lea
               "zapatilla" de un vistazo, tal como pidió el usuario. */}
-          <Forma d="M40 223 Q36 224 36 231 Q36 238 46 239 Q56 238 56 231 Q56 224 52 223 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
+          <Forma d={pieIzq} fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
           {/* cordones -- 2 líneas cortas cruzando el empeine. Un zigzag de
               un solo trazo (probado antes) se leía como una flecha o un
               tilde, no como cordones -- líneas paralelas simples son menos
@@ -1077,8 +1106,8 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
               ver más arriba). */}
           {conCordones && (
             <>
-              <line x1="41" y1="226" x2="51" y2="226" stroke={stroke} strokeWidth={0.6} />
-              <line x1="41" y1="229" x2="51" y2="229" stroke={stroke} strokeWidth={0.6} />
+              <line x1="41" y1={yCordon} x2="51" y2={yCordon} stroke={stroke} strokeWidth={0.6} />
+              <line x1="41" y1={yCordon + 3} x2="51" y2={yCordon + 3} stroke={stroke} strokeWidth={0.6} />
             </>
           )}
           <DecoracionCalzado corte={prenda.corte_calzado} tono={tonoDetalle} stroke={stroke} mirror={false} />
@@ -1096,11 +1125,11 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
               mitad del zapato -- el color principal de la prenda (fill)
               vuelve a ser el que domina el ícono, como corresponde. */}
           <path d="M36 237 H56 V240 Q56 242 53 242 L39 242 Q36 242 36 240 Z" fill={suela} stroke={stroke} {...strokeProps} />
-          <Forma d="M80 223 Q84 224 84 231 Q84 238 74 239 Q64 238 64 231 Q64 224 68 223 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
+          <Forma d={pieDer} fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
           {conCordones && (
             <>
-              <line x1="79" y1="226" x2="69" y2="226" stroke={stroke} strokeWidth={0.6} />
-              <line x1="79" y1="229" x2="69" y2="229" stroke={stroke} strokeWidth={0.6} />
+              <line x1="79" y1={yCordon} x2="69" y2={yCordon} stroke={stroke} strokeWidth={0.6} />
+              <line x1="79" y1={yCordon + 3} x2="69" y2={yCordon + 3} stroke={stroke} strokeWidth={0.6} />
             </>
           )}
           <DecoracionCalzado corte={prenda.corte_calzado} tono={tonoDetalle} stroke={stroke} mirror={true} />

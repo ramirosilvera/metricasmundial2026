@@ -368,6 +368,7 @@ export default function PrendaForm() {
                     <option value="zapato_vestir">Zapato de vestir (con cordones)</option>
                     <option value="mocasin">Mocasín (sin cordones)</option>
                     <option value="zapatilla_lona">Zapatilla de lona</option>
+                    <option value="botin">Botín / bota (caña sobre el tobillo)</option>
                   </select>
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
