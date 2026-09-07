@@ -1286,6 +1286,26 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   { id: "campera-gabardina-beige", nombre: "Campera de gabardina beige", categoria: "campera", colorHex: "#D8C7A1", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
   { id: "campera-gabardina-negra", nombre: "Campera de gabardina negra", categoria: "campera", colorHex: "#1A1A1A", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
 
+  // Marrón/camel -- pedido explícito del usuario, con foto adjunta: "agrega
+  // tmb esta campera marrón de gabardina de entre tiempo al catálogo". El
+  // corte de la foto (cuello mao con cierre, sin solapa) es la variante
+  // "bomber/harrington" de esta misma tela -- mismo criterio que
+  // campera-gabardina-beige/negra de acá arriba: la app no modela un corte
+  // de campera aparte por prenda, es la fibra/color lo que cambia la
+  // lectura, y en la silueta genérica de campera un mao-con-cierre y un
+  // cuello clásico de sobretodo se dibujan igual.
+  //
+  // El marrón muestreado por píxel de la foto (~#7D573E) cae en la misma
+  // familia "camel" que el resto del catálogo -- se reusa el hex ya
+  // establecido (#6F4E37, el mismo de pantalon-gabardina-marron,
+  // pantalon-pana-marron y sweater-algodon-marron) en vez de sumar un
+  // cuarto marrón casi idéntico: además de consistencia de paleta, esto
+  // deja que esta campera combine EXACTO con el pantalón de gabardina
+  // marrón ya cargado -- el mismo look de oficina (campera + pantalón, la
+  // misma tela y el mismo tono) que ya arma la foto (campera al tono con
+  // el resto del conjunto).
+  { id: "campera-gabardina-marron", nombre: "Campera de gabardina marrón", categoria: "campera", colorHex: "#6F4E37", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
+
   // --- Sacos ---
   // Categoría nueva -- pedido explícito del usuario ("quiero que agregues
   // al catálogo... un traje azul marino"). Revisado como modista: un

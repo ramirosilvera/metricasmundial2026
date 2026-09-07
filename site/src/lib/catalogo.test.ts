@@ -456,4 +456,18 @@ describe("catálogo -- campera de gabardina (oficina)", () => {
   it("es de entretiempo, la contraparte liviana del tapado de paño (lana/invierno)", () => {
     expect(camperasGabardina.every((p) => p.estacion === "entretiempo")).toBe(true);
   });
+
+  // Pedido explícito del usuario, ronda siguiente, con foto adjunta:
+  // "agrega tmb esta campera marrón de gabardina de entre tiempo al
+  // catálogo". Reusa a propósito el mismo hex camel que ya usa
+  // pantalon-gabardina-marron (ver ese describe más arriba) para que las
+  // dos prendas combinen EXACTO como conjunto de oficina, en vez de sumar
+  // un cuarto marrón casi idéntico al catálogo.
+  it("hay una campera de gabardina marrón, al mismo tono camel que el pantalón de gabardina marrón", () => {
+    const marron = camperasGabardina.find((p) => p.id === "campera-gabardina-marron");
+    expect(marron).toBeDefined();
+    expect(marron?.colorHex).toBe("#6F4E37");
+    const pantalonMarron = CATALOGO_PRENDAS.find((p) => p.id === "pantalon-gabardina-marron");
+    expect(marron?.colorHex).toBe(pantalonMarron?.colorHex);
+  });
 });
