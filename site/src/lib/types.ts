@@ -310,9 +310,19 @@ export interface Prenda {
  *  literalmente "Short_deportivo" en tarjetas y leyendas reales. El resto
  *  de las categorías quedan con el mismo string crudo que ya tenían (para
  *  no cambiar nada de lo que ya se veía bien) -- el único valor que cambia
- *  de verdad es short_deportivo, reemplazando el guion bajo por un espacio. */
+ *  de verdad es short_deportivo, reemplazando el guion bajo por un espacio.
+ *
+ *  "pantalon" -- bug real encontrado en la ronda de nombres específicos
+ *  (pedido explícito del usuario: "necesito que los nombres de las
+ *  prendas... sean más específicos para que los pueda reconocer"): el
+ *  valor del enum (sin tilde, como toda columna de Postgres) se copió acá
+ *  tal cual en vez de escribirse como texto visible real -- cualquier
+ *  pantalón que cae al genérico (ver descripcionPrenda más abajo, ej. uno
+ *  de pana/corderoy, hasta esta ronda sin rama propia) se mostraba
+ *  literalmente "Pantalon", sin tilde, en Placard/Outfits/Probar/
+ *  Recomendaciones. */
 export const CATEGORIA_LABEL: Record<Categoria, string> = {
-  pantalon: "pantalon",
+  pantalon: "pantalón",
   bermuda: "bermuda",
   short_deportivo: "short deportivo",
   remera: "remera",
@@ -371,7 +381,21 @@ export function descripcionPrenda(p: Prenda): string {
       if (esPantalon && p.calce === "holgado" && p.estilo !== "deportivo") return "Jogger";
       return esPantalon ? "Pantalón deportivo" : "Bermuda deportiva";
     }
-    if (p.textura === "algodon" && esPantalon) return p.estilo === "clasico" ? "Pantalón chino" : "Jogger";
+    if (p.textura === "algodon") {
+      if (!esPantalon) return "Bermuda chino";
+      return p.estilo === "clasico" ? "Pantalón chino" : "Jogger";
+    }
+    // pana/corderoy -- ronda de nombres específicos (pedido explícito del
+    // usuario: "necesito que los nombres de las prendas... sean más
+    // específicos para que los pueda reconocer"), revisada como sastre e
+    // ingeniero textil. Hueco real, encontrado corriendo descripcionPrenda
+    // contra el placard real del usuario: tenía 4 pantalones de
+    // pana/corderoy y los 4 caían al genérico "Pantalón" -- esta rama
+    // nunca se había escrito, aunque la textura ya existe en el catálogo
+    // desde la ronda de pantalon-pana-marron/verde. "corderoy" es sinónimo
+    // de "pana" en el enum (ver types.ts/PatronTextura en PrendaIcon.tsx),
+    // mismo nombre para las dos.
+    if (p.textura === "pana" || p.textura === "corderoy") return esPantalon ? "Pantalón de pana" : "Bermuda de pana";
   }
   if (p.categoria === "buzo") return p.con_capucha ? "Buzo con capucha" : "Buzo sin capucha";
   // chomba/polo -- ver Cuello en types.ts (ronda de completitud del
@@ -379,6 +403,19 @@ export function descripcionPrenda(p: Prenda): string {
   // "Remera" sin excepción -- una chomba con cuello camisero abrochado es
   // una prenda con nombre propio, no una remera más.
   if (p.categoria === "remera" && p.cuello === "polo") return "Chomba";
+  // remera deportiva -- ronda de nombres específicos, mismo hueco real que
+  // el resto de las ramas nuevas de acá abajo: el catálogo ya nombra estas
+  // prendas "Remera deportiva" (ver remera-deportiva-negra/gris en
+  // catalogo.ts) y el ícono ya les dibuja la manga raglán real (ver
+  // esRemeraDeportiva en PrendaIcon.tsx, mismo criterio de textura), pero
+  // descripcionPrenda nunca tuvo una rama para remera -- toda remera de
+  // poliéster del placard real del usuario se mostraba "Remera" a secas,
+  // indistinguible de una remera de algodón común.
+  if (p.categoria === "remera" && p.textura === "poliester") return "Remera deportiva";
+  // a rayas (Breton stripe) -- mismo hallazgo que la de arriba: el
+  // catálogo ya tiene "remera-rayas-marina" con este nombre específico,
+  // pero sin esta rama caía en el genérico "Remera" como cualquier otra.
+  if (p.categoria === "remera" && p.patron === "rayas") return "Remera a rayas";
   if (p.categoria === "sweater") {
     // chaleco -- ver Manga en types.ts: primero, porque un chaleco de
     // lana sigue siendo chaleco (la ausencia de mangas es lo que define
@@ -395,6 +432,27 @@ export function descripcionPrenda(p: Prenda): string {
   if (p.categoria === "campera") {
     if (p.textura === "denim") return "Campera de jean";
     if (p.textura === "acolchado") return "Campera de pluma";
+    // pana/corderoy -- ronda de nombres específicos: hueco real, mismo
+    // motivo que pantalón/bermuda de pana más arriba. Sin ambigüedad (a
+    // diferencia de la lana, ver más abajo): el catálogo no tiene ningún
+    // otro archetype de campera de pana, y es una prenda real con nombre
+    // propio -- el "chaqueta de pana" de entretiempo clásico, la pareja de
+    // torso del pantalón de pana.
+    if (p.textura === "pana" || p.textura === "corderoy") return "Campera de pana";
+    // lana -- a diferencia del resto de las texturas de acá, esta SIGUE
+    // siendo ambigua sin más dato: puede ser un tapado de paño (abrigo de
+    // vestir sobre un traje, ver tapado-pano-gris en catalogo.ts) o una
+    // campera-sweater/cardigan de punto con cierre (ver
+    // campera-sweater-azul-marino y esCamperaDePunto en PrendaIcon.tsx) --
+    // dos prendas reales bien distintas con la misma fibra. Lo que las
+    // separa en el catálogo es la ESTACIÓN (mismo dato ya usado por
+    // esCamperaDePunto para decidir el dibujo: cardigan en entretiempo,
+    // tapado en invierno) -- si la prenda la tiene cargada, ya no hace
+    // falta dejarla en el genérico.
+    if (p.textura === "lana") {
+      if (p.estacion === "invierno") return "Tapado de paño";
+      if (p.estacion === "entretiempo") return "Campera sweater";
+    }
     // poliester/impermeable agregados junto con "campera-piloto-negra"
     // (pedido explícito del usuario: "la campera piloto en realidad es una
     // campera impermeable") -- a diferencia de campera+lana, acá SÍ
@@ -437,6 +495,22 @@ export function descripcionPrenda(p: Prenda): string {
   // típicamente algodón/gabardina, = gorra de visera).
   if (p.categoria === "accesorio" && p.posicion_accesorio === "cabeza") {
     return p.textura === "lana" ? "Gorro de lana" : "Gorra";
+  }
+  // cinturón/corbata/bufanda -- ronda de nombres específicos (pedido
+  // explícito del usuario: "necesito que los nombres de las prendas...
+  // sean más específicos"). Hueco real y de los más grandes encontrados
+  // corriendo esta función contra el placard real del usuario: "accesorio"
+  // es la categoría más vieja del catálogo (posicion_accesorio existe
+  // desde la migración 0016) y sin embargo nunca tuvo una rama propia acá
+  // -- un cinturón de cuero, una corbata de seda y una bufanda de lana se
+  // mostraban las tres, literalmente, "Accesorio". Mismos datos que ya usa
+  // el dibujo (PrendaIcon.tsx/Maniqui.tsx) para elegir la forma -- no hace
+  // falta inventar nada nuevo, solo nombrarlo con esos mismos dos campos:
+  // posicion_accesorio distingue cintura (cinturón) de cuello (corbata o
+  // bufanda), y requiere_cuello distingue esas dos entre sí.
+  if (p.categoria === "accesorio" && p.posicion_accesorio === "cintura") return "Cinturón";
+  if (p.categoria === "accesorio" && p.posicion_accesorio === "cuello") {
+    return p.requiere_cuello ? "Corbata" : "Bufanda";
   }
   const generico = CATEGORIA_LABEL[p.categoria];
   return generico.charAt(0).toUpperCase() + generico.slice(1);

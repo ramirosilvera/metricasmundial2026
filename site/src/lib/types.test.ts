@@ -161,13 +161,54 @@ describe("descripcionPrenda", () => {
     );
   });
 
-  it("campera de denim/acolchado/poliester/impermeable/tricot se describe específicamente; campera de lana (ambigua) cae al genérico", () => {
+  it("campera de denim/acolchado/poliester/impermeable/tricot se describe específicamente; campera de lana SIN estación (ambigua) cae al genérico", () => {
     expect(descripcionPrenda(mkPrenda("campera", { textura: "denim" }))).toBe("Campera de jean");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "acolchado" }))).toBe("Campera de pluma");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "poliester" }))).toBe("Campera rompeviento");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "impermeable" }))).toBe("Campera impermeable");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "tricot" }))).toBe("Campera deportiva");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "lana" }))).toBe("Campera");
+  });
+
+  // Ronda de nombres específicos (pedido explícito del usuario: "necesito
+  // que los nombres de las prendas de mi placard y del outfit sean más
+  // específicos para que los pueda reconocer"), revisada como sastre,
+  // ingeniero textil y asesor de imagen. Corriendo descripcionPrenda contra
+  // el placard real del usuario se encontraron varios huecos reales --
+  // cada uno cubierto por un test acá.
+  it("campera de lana CON estación se desambigua: invierno -> tapado, entretiempo -> campera sweater", () => {
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "lana", estacion: "invierno" }))).toBe("Tapado de paño");
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "lana", estacion: "entretiempo" }))).toBe("Campera sweater");
+    // verano no tiene un archetype real de campera de lana -- sigue
+    // cayendo al genérico, no se inventa un tercer nombre sin sentido.
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "lana", estacion: "verano" }))).toBe("Campera");
+  });
+
+  it("campera/pantalón/bermuda de pana (o su sinónimo corderoy) se describen específicamente", () => {
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "pana" }))).toBe("Campera de pana");
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "corderoy" }))).toBe("Campera de pana");
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "pana" }))).toBe("Pantalón de pana");
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "corderoy" }))).toBe("Pantalón de pana");
+    expect(descripcionPrenda(mkPrenda("bermuda", { textura: "corderoy" }))).toBe("Bermuda de pana");
+  });
+
+  it("bermuda de algodón clásico es Bermuda chino, pareja de Pantalón chino", () => {
+    expect(descripcionPrenda(mkPrenda("bermuda", { textura: "algodon", estilo: "clasico" }))).toBe("Bermuda chino");
+  });
+
+  it("remera deportiva (poliéster) y remera a rayas se describen específicamente", () => {
+    expect(descripcionPrenda(mkPrenda("remera", { textura: "poliester" }))).toBe("Remera deportiva");
+    expect(descripcionPrenda(mkPrenda("remera", { patron: "rayas" }))).toBe("Remera a rayas");
+  });
+
+  it("cinturón/corbata/bufanda se distinguen por posicion_accesorio + requiere_cuello -- antes las tres eran 'Accesorio' a secas", () => {
+    expect(descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cintura" }))).toBe("Cinturón");
+    expect(
+      descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cuello", requiere_cuello: true })),
+    ).toBe("Corbata");
+    expect(
+      descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cuello", requiere_cuello: false })),
+    ).toBe("Bufanda");
   });
 
   it("sin textura cargada, cae en CATEGORIA_LABEL capitalizado", () => {
