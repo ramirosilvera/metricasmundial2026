@@ -28,6 +28,8 @@ function mkPrenda(categoria: Prenda["categoria"], overrides: Partial<Prenda> = {
     color2_l: null,
     corte_calzado: "zapatilla_urbana",
     calce: "regular",
+    cuello: null,
+    manga: null,
     necesita_cambio: false,
     created_at: "",
     updated_at: "",
@@ -119,6 +121,46 @@ describe("descripcionPrenda", () => {
     expect(descripcionPrenda(mkPrenda("sweater", { textura: "lana" }))).toBe("Sweater");
   });
 
+  // Ronda de completitud del catálogo (ver Cuello/Manga en types.ts,
+  // pedido explícito del usuario: "revisá todas las prendas del
+  // catálogo... si se puede completar aún más").
+  it("chomba (remera cuello polo) se distingue de una remera lisa", () => {
+    expect(descripcionPrenda(mkPrenda("remera", { cuello: "polo" }))).toBe("Chomba");
+    expect(descripcionPrenda(mkPrenda("remera", { cuello: "redondo" }))).toBe("Remera");
+    expect(descripcionPrenda(mkPrenda("remera"))).toBe("Remera");
+  });
+
+  it("chaleco (sweater sin mangas) se nombra por la ausencia de mangas, sin importar la fibra", () => {
+    expect(descripcionPrenda(mkPrenda("sweater", { manga: "sin_mangas", textura: "lana" }))).toBe("Chaleco");
+    // aunque también sea de una fibra "liviana" -- sin_mangas manda primero,
+    // no cae en "Sweater liviano".
+    expect(descripcionPrenda(mkPrenda("sweater", { manga: "sin_mangas", textura: "viscosa" }))).toBe("Chaleco");
+  });
+
+  it("sweater cuello alto se distingue del genérico y del liviano", () => {
+    expect(descripcionPrenda(mkPrenda("sweater", { cuello: "alto", textura: "lana" }))).toBe("Sweater cuello alto");
+    // cuello alto manda antes que el chequeo de fibra liviana.
+    expect(descripcionPrenda(mkPrenda("sweater", { cuello: "alto", textura: "viscosa" }))).toBe("Sweater cuello alto");
+  });
+
+  it("camisa manga corta se distingue de la de manga larga, después del patrón", () => {
+    expect(descripcionPrenda(mkPrenda("camisa", { manga: "corta" }))).toBe("Camisa manga corta");
+    expect(descripcionPrenda(mkPrenda("camisa", { manga: "larga" }))).toBe("Camisa");
+    expect(descripcionPrenda(mkPrenda("camisa"))).toBe("Camisa");
+    // el patrón sigue siendo más específico: una camisa a rayas de manga
+    // corta se sigue leyendo "a rayas" primero.
+    expect(descripcionPrenda(mkPrenda("camisa", { manga: "corta", patron: "rayas" }))).toBe("Camisa a rayas");
+  });
+
+  it("gorro de lana vs. gorra, distinguidos por textura", () => {
+    expect(descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cabeza", textura: "lana" }))).toBe(
+      "Gorro de lana",
+    );
+    expect(descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cabeza", textura: "algodon" }))).toBe(
+      "Gorra",
+    );
+  });
+
   it("campera de denim/acolchado/poliester/impermeable/tricot se describe específicamente; campera de lana (ambigua) cae al genérico", () => {
     expect(descripcionPrenda(mkPrenda("campera", { textura: "denim" }))).toBe("Campera de jean");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "acolchado" }))).toBe("Campera de pluma");
@@ -157,6 +199,10 @@ describe("descripcionPrenda", () => {
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapato_vestir" }))).toBe("Zapatos de vestir");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "mocasin" }))).toBe("Mocasines");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapatilla_lona" }))).toBe("Zapatillas de lona");
+    // botín/sandalia -- ronda de completitud del catálogo (ver
+    // CorteCalzado en types.ts).
+    expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "botin" }))).toBe("Botines");
+    expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "sandalia" }))).toBe("Sandalias");
   });
 });
 

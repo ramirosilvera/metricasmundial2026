@@ -254,7 +254,21 @@ function Forma({
 }
 
 function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
-  const mangaCorta = MANGA_CORTA.includes(prenda.categoria);
+  // manga "corta" -- ver Manga en types.ts, ronda de completitud del
+  // catálogo: reusa EXACTAMENTE el mismo mecanismo que ya distinguía la
+  // manga corta de remera (MANGA_CORTA) de la manga larga del resto --
+  // antes de esta ronda esa lista era la única fuente de verdad posible
+  // (una categoría entera es de manga corta o no lo es), así que una
+  // camisa de manga corta no tenía forma de pedir el brazo corto sin ser,
+  // a los ojos de este componente, una remera. Ahora el dato explícito de
+  // la prenda puede pedirlo también.
+  const mangaCorta = MANGA_CORTA.includes(prenda.categoria) || prenda.manga === "corta";
+  // chaleco (sweater sin mangas) -- ver Manga en types.ts: la única prenda
+  // de este catálogo sin sleeve de ningún largo. Se resuelve SIN dibujar
+  // ninguna de las dos piezas de manga (ni la corta ni la larga) más abajo,
+  // no como una tercera variante de largo -- un chaleco no tiene manga, no
+  // tiene "manga de largo cero".
+  const sinMangas = prenda.categoria === "sweater" && prenda.manga === "sin_mangas";
   const sugerida = esSugerida(prenda);
   // estampado (rayas/cuadros) -- mismo mecanismo que en PrendaIcon.tsx (ver
   // el comentario largo de PatronEstampado ahí): reemplaza el relleno del
@@ -354,63 +368,70 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
 
           {/* mangas -- paths propios que arrancan en el hombro y siguen el
               brazo, para que no "floten" en el aire como cuando eran parte
-              de un ícono cuadrado genérico. */}
-          {mangaCorta ? (
-            <>
-              {/* continuidad hombro-brazo -- pedido explícito del usuario
-                  ("que no esté esa división, más continuo como un cuerpo
-                  humano"). La curva del torso sale del hombro casi vertical
-                  (control a solo 2-3u al costado); la manga arrancaba con
-                  un tirón casi horizontal (control a 7u al costado) desde
-                  el mismo punto -- ese cambio brusco de dirección en un
-                  punto compartido es lo que se lee como un corte/costura,
-                  no una curva de hombro real. Se achica el tirón inicial
-                  (7u -> 2u) para que la dirección de salida se parezca más
-                  a la del torso -- el hombro dobla gradualmente hacia el
-                  brazo en vez de quebrar en ángulo. */}
-              <Forma d="M34 48 Q32 51 30 64 Q27 74 34 77 Q38 74 39 68 Q37 56 34 48 Z" fill={fill} stroke={stroke} patron={patron} sugerida={sugerida} />
-              <Forma d="M86 48 Q88 51 90 64 Q93 74 86 77 Q82 74 81 68 Q83 56 86 48 Z" fill={fill} stroke={stroke} patron={patron} sugerida={sugerida} />
-              {/* cinta clara cerca del puño de cada manga -- el detalle
-                  reflectante real de una remera de entrenamiento, foto de
-                  referencia del usuario. Blanco fijo (no derivado del color
-                  de la prenda): una cinta reflectante real es siempre clara/
-                  plateada. Cerca del extremo de la manga corta (y=73-77,
-                  la punta del path de arriba), dibujada después para quedar
-                  encima de la tela. */}
-              {esRemeraDeportiva(prenda.categoria, prenda.textura) && (
-                <>
-                  <line x1="29" y1="73" x2="37" y2="75" stroke="rgba(255,255,255,0.9)" strokeWidth={1.6} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                  <line x1="91" y1="73" x2="83" y2="75" stroke="rgba(255,255,255,0.9)" strokeWidth={1.6} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              {/* brazos más sueltos -- pedido explícito del usuario. El
-                  hombro (48-60) queda fijo como pivote natural; de ahí para
-                  abajo el brazo se angula hacia afuera del cuerpo en vez de
-                  caer en paralelo estricto al torso, como brazos relajados
-                  de verdad. */}
-              {/* misma continuidad hombro-brazo que en la manga corta (ver
-                  ese comentario) -- tirón inicial reducido para que la
-                  curva no quiebre en ángulo justo donde se junta con el
-                  torso. */}
-              <Forma
-                d="M34 48 Q32 51 31 60 L25 114 Q25 120 29 121 L34 121 Q37 120 36 114 L39 60 Q38 52 34 48 Z"
-                fill={fill}
-                stroke={stroke}
-                patron={patron}
-                sugerida={sugerida}
-              />
-              <Forma
-                d="M86 48 Q88 51 89 60 L95 114 Q95 120 91 121 L86 121 Q83 120 84 114 L81 60 Q82 52 86 48 Z"
-                fill={fill}
-                stroke={stroke}
-                patron={patron}
-                sugerida={sugerida}
-              />
-            </>
-          )}
+              de un ícono cuadrado genérico.
+              chaleco (sinMangas, ver Manga en types.ts) -- ronda de
+              completitud del catálogo: ninguna de las dos piezas de acá
+              abajo se dibuja. El brazo desnudo del maniquí de base (la
+              silueta que ya queda visible en cualquier zona sin prenda
+              cargada, ver el comentario grande al inicio de este archivo)
+              se ve entero, exactamente el efecto real de un chaleco. */}
+          {!sinMangas &&
+            (mangaCorta ? (
+              <>
+                {/* continuidad hombro-brazo -- pedido explícito del usuario
+                    ("que no esté esa división, más continuo como un cuerpo
+                    humano"). La curva del torso sale del hombro casi vertical
+                    (control a solo 2-3u al costado); la manga arrancaba con
+                    un tirón casi horizontal (control a 7u al costado) desde
+                    el mismo punto -- ese cambio brusco de dirección en un
+                    punto compartido es lo que se lee como un corte/costura,
+                    no una curva de hombro real. Se achica el tirón inicial
+                    (7u -> 2u) para que la dirección de salida se parezca más
+                    a la del torso -- el hombro dobla gradualmente hacia el
+                    brazo en vez de quebrar en ángulo. */}
+                <Forma d="M34 48 Q32 51 30 64 Q27 74 34 77 Q38 74 39 68 Q37 56 34 48 Z" fill={fill} stroke={stroke} patron={patron} sugerida={sugerida} />
+                <Forma d="M86 48 Q88 51 90 64 Q93 74 86 77 Q82 74 81 68 Q83 56 86 48 Z" fill={fill} stroke={stroke} patron={patron} sugerida={sugerida} />
+                {/* cinta clara cerca del puño de cada manga -- el detalle
+                    reflectante real de una remera de entrenamiento, foto de
+                    referencia del usuario. Blanco fijo (no derivado del color
+                    de la prenda): una cinta reflectante real es siempre clara/
+                    plateada. Cerca del extremo de la manga corta (y=73-77,
+                    la punta del path de arriba), dibujada después para quedar
+                    encima de la tela. */}
+                {esRemeraDeportiva(prenda.categoria, prenda.textura) && (
+                  <>
+                    <line x1="29" y1="73" x2="37" y2="75" stroke="rgba(255,255,255,0.9)" strokeWidth={1.6} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                    <line x1="91" y1="73" x2="83" y2="75" stroke="rgba(255,255,255,0.9)" strokeWidth={1.6} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {/* brazos más sueltos -- pedido explícito del usuario. El
+                    hombro (48-60) queda fijo como pivote natural; de ahí para
+                    abajo el brazo se angula hacia afuera del cuerpo en vez de
+                    caer en paralelo estricto al torso, como brazos relajados
+                    de verdad. */}
+                {/* misma continuidad hombro-brazo que en la manga corta (ver
+                    ese comentario) -- tirón inicial reducido para que la
+                    curva no quiebre en ángulo justo donde se junta con el
+                    torso. */}
+                <Forma
+                  d="M34 48 Q32 51 31 60 L25 114 Q25 120 29 121 L34 121 Q37 120 36 114 L39 60 Q38 52 34 48 Z"
+                  fill={fill}
+                  stroke={stroke}
+                  patron={patron}
+                  sugerida={sugerida}
+                />
+                <Forma
+                  d="M86 48 Q88 51 89 60 L95 114 Q95 120 91 121 L86 121 Q83 120 84 114 L81 60 Q82 52 86 48 Z"
+                  fill={fill}
+                  stroke={stroke}
+                  patron={patron}
+                  sugerida={sugerida}
+                />
+              </>
+            ))}
 
           {/* cuerpo del torso -- un poco más ancho que el maniquí de base
               para que la tela "caiga por fuera" en vez de coincidir exacto
@@ -573,9 +594,62 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
               <line x1="60" y1="58" x2="60" y2="124" stroke={stroke} {...strokeProps} />
             </>
           )}
-          {prenda.categoria === "sweater" && (
-            <path d="M48 40 Q60 46 72 40" fill="none" stroke={stroke} {...strokeProps} strokeWidth={3} />
+          {prenda.categoria === "remera" && prenda.cuello === "polo" && (
+            // Chomba/polo -- ver Cuello en types.ts, ronda de completitud
+            // del catálogo. Cuello de punto más chato que el cuello
+            // camisero armado de "camisa" de más arriba (un polo real se
+            // cose en tejido, sin entretela rígida) -- una sola pieza por
+            // lado en vez de tira+puntas, apoyada más baja (y=44, no y=42)
+            // porque el escote de remera de más abajo (Q78 42 64 46...) es
+            // más angosto que el de camisa -- + placket corto de 2
+            // botones, la seña real que distingue una chomba de una
+            // remera lisa.
+            <>
+              <path d="M46 44 L60 56 L52 44 Z" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
+              <path d="M74 44 L60 56 L68 44 Z" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
+              <line x1="60" y1="56" x2="60" y2="76" stroke={stroke} {...strokeProps} />
+              <circle cx="60" cy="62" r="1.4" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} />
+              <circle cx="60" cy="70" r="1.4" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} />
+            </>
           )}
+          {prenda.categoria === "sweater" &&
+            (() => {
+              // Cuello (redondo/v/alto) -- ver Cuello en types.ts, ronda
+              // de completitud del catálogo: hasta esta ronda
+              // "sweater-cuello-alto-negro" existía con ese nombre en el
+              // catálogo pero se dibujaba con la MISMA línea en V que
+              // cualquier otro sweater -- el nombre prometía un cuello
+              // alto que el maniquí nunca mostraba.
+              switch (prenda.cuello) {
+                case "redondo":
+                  // escote redondo -- una curva más profunda que la V
+                  // default (control en y=50 contra y=46), la misma
+                  // diferencia real de amplitud que separa un crewneck de
+                  // un V-neck.
+                  return <path d="M46 40 Q60 50 74 40" fill="none" stroke={stroke} {...strokeProps} strokeWidth={3} />;
+                case "alto":
+                  // cuello alto (turtleneck) -- a diferencia del V/redondo
+                  // (una línea sobre piel visible), acá no hay piel que
+                  // mostrar: una banda ENROLLADA y sólida que tapa todo el
+                  // hueco del escote, subiendo hasta y=34 -- el límite real
+                  // que deja este maniquí antes de tocar la cabeza (que
+                  // termina en y=35, ver el comentario del cierre de
+                  // escote más arriba). Es poco margen, pero es
+                  // justamente la seña correcta: un cuello alto real tapa
+                  // el cuello casi hasta el mentón.
+                  return (
+                    <path
+                      d="M46 40 Q60 34 74 40 L74 44 Q60 48 46 44 Z"
+                      fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)}
+                      stroke={stroke}
+                      {...strokeProps}
+                    />
+                  );
+                case "v":
+                default:
+                  return <path d="M48 40 Q60 46 72 40" fill="none" stroke={stroke} {...strokeProps} strokeWidth={3} />;
+              }
+            })()}
           {(prenda.categoria === "sweater" ||
             prenda.categoria === "buzo" ||
             // campera de punto (cardigan con cierre, ver esCamperaDePunto
@@ -955,16 +1029,38 @@ function PiernasCuerpo({ prenda }: { prenda: Prenda }) {
 function DecoracionCalzado({
   corte,
   tono,
+  fill,
   stroke,
   mirror,
 }: {
   corte: CorteCalzado;
   tono: string;
+  /** Color PRINCIPAL de la prenda (no `tono`/detalle) -- solo lo usa
+   *  "sandalia": a diferencia del resto de los cortes (donde esto dibuja
+   *  un detalle secundario sobre una capellada cerrada, ej. el perforado
+   *  del zapato de vestir), en una sandalia las tiras SON la prenda -- la
+   *  misma pieza de cuero que la suela, no otro material -- así que
+   *  llevan el color base, no el de contraste. Opcional porque ningún
+   *  otro corte lo necesita. */
+  fill?: string;
   stroke: string;
   mirror: boolean;
 }) {
   const mx = (x: number) => (mirror ? 120 - x : x);
   switch (corte) {
+    case "sandalia":
+      // Dos tiras (del empeine + del tobillo) cruzando la suela chata --
+      // ver CorteCalzado en types.ts, ronda de completitud del catálogo.
+      // Mismo criterio que el ícono chico (PrendaIcon.tsx): un hueco entre
+      // el extremo del dedo (no dibujado -- ver el sole plano en
+      // PiesCuerpo) y la primera tira, para que se lea "sandalia" y no
+      // "zapato chato".
+      return (
+        <>
+          <path d={`M${mx(38)} 231 Q${mx(42)} 213 ${mx(46)} 231 Q${mx(42)} 225 ${mx(38)} 231 Z`} fill={fill ?? tono} stroke={stroke} strokeWidth={0.5} />
+          <path d={`M${mx(48)} 231 Q${mx(52)} 208 ${mx(56)} 231 Q${mx(52)} 222 ${mx(48)} 231 Z`} fill={fill ?? tono} stroke={stroke} strokeWidth={0.5} />
+        </>
+      );
     case "zapatilla_running":
       // silueta técnica: panel diagonal ancho (relleno), SIN las 3 rayas
       // de la urbana -- ver el comentario largo en types.ts.
@@ -1048,8 +1144,9 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
   // definitorio de un mocasín (ver CorteCalzado en types.ts), a diferencia
   // del resto de los cortes, que sí los llevan (incluido el zapato de
   // vestir, con cordones más discretos en la vida real pero cordones al
-  // fin).
-  const conCordones = prenda.corte_calzado !== "mocasin";
+  // fin). sandalia -- ronda de completitud del catálogo: tampoco lleva
+  // cordones, no hay empeine cerrado donde ponerlos.
+  const conCordones = prenda.corte_calzado !== "mocasin" && prenda.corte_calzado !== "sandalia";
   // El botín es el único corte que cambia la SILUETA y no solo la
   // decoración (ver CorteCalzado en types.ts): la caña arranca donde los
   // demás cortes ya terminaron (y=223) y sube por encima del tobillo. Se
@@ -1057,6 +1154,13 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
   // botín real usado con el pantalón por fuera. Los cordones y la
   // decoración se corren con ella.
   const esBotin = prenda.corte_calzado === "botin";
+  // La sandalia es el otro corte (junto con el botín) que cambia la
+  // silueta entera -- ver CorteCalzado en types.ts. Sin capellada cerrada,
+  // la "silueta" es apenas la suela chata (pieIzq/pieDer más abajo, en vez
+  // de la variante compartida botín/cerrado de estas mismas variables) --
+  // el pie se ve bajo y abierto, con las tiras de DecoracionCalzado
+  // cruzando por encima.
+  const esSandalia = prenda.corte_calzado === "sandalia";
   const yCana = esBotin ? 212 : 223;
   // la caña además AFINA hacia arriba (arranca en 41-51 y se abre a 36-56
   // recién a la altura del pie): un botín real es más angosto en el tobillo
@@ -1064,8 +1168,12 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
   // bloque parejo, más balde que bota.
   const xCana = esBotin ? { izqA: 41, izqB: 51, derA: 79, derB: 69 } : { izqA: 40, izqB: 52, derA: 80, derB: 68 };
   const yApertura = yCana + (esBotin ? 11 : 1);
-  const pieIzq = `M${xCana.izqA} ${yCana} Q36 ${yApertura} 36 231 Q36 238 46 239 Q56 238 56 231 Q56 ${yApertura} ${xCana.izqB} ${yCana} Z`;
-  const pieDer = `M${xCana.derA} ${yCana} Q84 ${yApertura} 84 231 Q84 238 74 239 Q64 238 64 231 Q64 ${yApertura} ${xCana.derB} ${yCana} Z`;
+  const pieIzq = esSandalia
+    ? "M38 231 Q36 233 36 237 Q36 240 46 241 Q56 240 56 237 Q56 233 54 231 Z"
+    : `M${xCana.izqA} ${yCana} Q36 ${yApertura} 36 231 Q36 238 46 239 Q56 238 56 231 Q56 ${yApertura} ${xCana.izqB} ${yCana} Z`;
+  const pieDer = esSandalia
+    ? "M82 231 Q84 233 84 237 Q84 240 74 241 Q64 240 64 237 Q64 233 66 231 Z"
+    : `M${xCana.derA} ${yCana} Q84 ${yApertura} 84 231 Q84 238 74 239 Q64 238 64 231 Q64 ${yApertura} ${xCana.derB} ${yCana} Z`;
   const yCordon = esBotin ? 230 : 226;
   return (
     <Volumen
@@ -1110,7 +1218,7 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
               <line x1="41" y1={yCordon + 3} x2="51" y2={yCordon + 3} stroke={stroke} strokeWidth={0.6} />
             </>
           )}
-          <DecoracionCalzado corte={prenda.corte_calzado} tono={tonoDetalle} stroke={stroke} mirror={false} />
+          <DecoracionCalzado corte={prenda.corte_calzado} tono={tonoDetalle} fill={fill} stroke={stroke} mirror={false} />
           {/* suela_contraste=true (bug real reportado por el usuario: "en
               mejor opción dice zapatilla urbana negro pero muestra
               blanco"): con la franja de suela vieja (234 a 242, la mitad
@@ -1132,7 +1240,7 @@ function PiesCuerpo({ prenda }: { prenda: Prenda }) {
               <line x1="79" y1={yCordon + 3} x2="69" y2={yCordon + 3} stroke={stroke} strokeWidth={0.6} />
             </>
           )}
-          <DecoracionCalzado corte={prenda.corte_calzado} tono={tonoDetalle} stroke={stroke} mirror={true} />
+          <DecoracionCalzado corte={prenda.corte_calzado} tono={tonoDetalle} fill={fill} stroke={stroke} mirror={true} />
           <path d="M84 237 H64 V240 Q64 242 67 242 L81 242 Q84 242 84 240 Z" fill={suela} stroke={stroke} {...strokeProps} />
         </>
       )}
@@ -1145,6 +1253,50 @@ function AccesorioCuerpo({ prenda, cortadaEn }: { prenda: Prenda; cortadaEn?: nu
   // regla automática por categoria -- antes de esa columna, un cinturón,
   // una corbata y una bufanda dibujaban el mismo bloque a la altura de la
   // cintura, así lo reportó un usuario viendo el maniquí real.
+  //
+  // "cabeza" -- ronda de completitud del catálogo: va primero, antes del
+  // `!== "cuello"` de acá abajo (que hasta esta ronda trataba cualquier
+  // valor que no fuera "cuello" como cinturón -- un gorro de lana se
+  // dibujaba como una tira con hebilla a la altura de la cintura, ni
+  // siquiera cerca de la cabeza). Sobre la cabeza del maniquí (cx=60,
+  // cy=20, rx=13, ry=15, ver más abajo en este archivo -- spans x=47-73,
+  // y=5-35), distinguido por textura, mismo criterio que descripcionPrenda
+  // en types.ts: lana = gorro/beanie (dome + banda doblada), el resto =
+  // gorra de visera.
+  if (prenda.posicion_accesorio === "cabeza") {
+    return (
+      <Volumen
+        prenda={prenda}
+        hijos={(fill, stroke, patron) =>
+          prenda.textura === "lana" ? (
+            <>
+              <Forma d="M47 20 Q47 4 60 4 Q73 4 73 20 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
+              {/* banda doblada -- el dobladillo grueso de un gorro de lana
+                  real, en detalleHsl para que se note contra el dome de
+                  arriba (mismo criterio de contraste que usa el resto del
+                  archivo, ej. las solapas del saco). */}
+              <rect x="45" y="16" width="30" height="7" rx="3.5" fill={detalleHsl(prenda.color_h, prenda.color_s, prenda.color_l)} stroke={stroke} {...strokeProps} />
+            </>
+          ) : (
+            <>
+              <Forma d="M47 22 Q47 4 60 4 Q73 4 73 22 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
+              {/* visera -- la seña real que distingue una gorra de un
+                  gorro, sin ambigüedad. Centrada y apuntando hacia
+                  adelante/abajo (no hacia un costado): a diferencia del
+                  ícono chico (PrendaIcon.tsx), que puede leerse como una
+                  gorra vista de 3/4, este maniquí es una silueta de frente
+                  estrictamente simétrica -- una visera lateral se leía
+                  como un bulto roto en la cabeza, no como una gorra
+                  puesta. Una visera centrada que cae sobre la frente,
+                  como se ve una gorra real puesta de frente, es la que
+                  encaja con el resto de la silueta. */}
+              <Forma d="M49 20 Q60 27 71 20 Q68 25 60 26 Q52 25 49 20 Z" fill={fill} stroke={stroke} patron={patron} sugerida={esSugerida(prenda)} />
+            </>
+          )
+        }
+      />
+    );
+  }
   if (prenda.posicion_accesorio !== "cuello") {
     return (
       <Volumen

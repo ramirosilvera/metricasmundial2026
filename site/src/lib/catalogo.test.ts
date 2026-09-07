@@ -321,4 +321,76 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
   it("ningún calzado fuerza `estacion` -- tampoco el botín", () => {
     expect(calzado.every((p) => !p.estacion)).toBe(true);
   });
+
+  // Sandalias -- ronda de completitud del catálogo (ver CorteCalzado en
+  // types.ts): la contraparte de verano del botín. Sin ella, un placard
+  // armado con este catálogo no tenía calzado real de verano/calle, solo
+  // zapatilla cerrada todo el año.
+  it("hay sandalias de cuero", () => {
+    const sandalias = calzado.filter((p) => p.corteCalzado === "sandalia");
+    expect(sandalias.length).toBeGreaterThan(0);
+    expect(sandalias.every((p) => p.textura === "cuero_liso")).toBe(true);
+  });
+});
+
+// Ronda de completitud del catálogo (pedido explícito del usuario: "revisá
+// todas las prendas del catálogo, quiero que me digas si está completo o
+// se puede completar aún más"), revisada como modista y asesor de imagen.
+describe("catálogo -- chomba/polo (ver Cuello en types.ts)", () => {
+  const chombas = CATALOGO_PRENDAS.filter((p) => p.categoria === "remera" && p.cuello === "polo");
+
+  it("existe al menos una chomba, categoria remera con cuello polo", () => {
+    expect(chombas.length).toBeGreaterThan(0);
+  });
+
+  it("es de registro clasico (smart-casual), no formal ni deportivo", () => {
+    expect(chombas.every((p) => p.estilo === "clasico")).toBe(true);
+  });
+});
+
+describe("catálogo -- chaleco (sweater sin mangas, ver Manga en types.ts)", () => {
+  const chalecos = CATALOGO_PRENDAS.filter((p) => p.categoria === "sweater" && p.manga === "sin_mangas");
+
+  it("existe al menos un chaleco", () => {
+    expect(chalecos.length).toBeGreaterThan(0);
+  });
+
+  it("es de lana e invierno, mismo criterio textil que el resto de los sweaters de oficina", () => {
+    expect(chalecos.every((p) => p.textura === "lana" && p.estacion === "invierno")).toBe(true);
+  });
+});
+
+describe("catálogo -- sweater cuello alto (ver Cuello en types.ts)", () => {
+  it("sweater-cuello-alto-negro declara cuello 'alto' explícitamente", () => {
+    const p = CATALOGO_PRENDAS.find((p) => p.id === "sweater-cuello-alto-negro");
+    expect(p?.cuello).toBe("alto");
+  });
+});
+
+describe("catálogo -- camisa de manga corta (ver Manga en types.ts)", () => {
+  const mangaCorta = CATALOGO_PRENDAS.filter((p) => p.categoria === "camisa" && p.manga === "corta");
+
+  it("existe al menos una camisa de manga corta", () => {
+    expect(mangaCorta.length).toBeGreaterThan(0);
+  });
+
+  it("es de registro oficina/laburo, como el resto de las camisas lisas de oficina", () => {
+    expect(mangaCorta.every((p) => p.estilosSecundarios?.includes("oficina"))).toBe(true);
+  });
+});
+
+describe("catálogo -- gorro/gorra (posicion_accesorio 'cabeza', ver types.ts)", () => {
+  const deCabeza = CATALOGO_PRENDAS.filter((p) => p.categoria === "accesorio" && p.posicionAccesorio === "cabeza");
+  const gorros = deCabeza.filter((p) => p.textura === "lana");
+  const gorras = deCabeza.filter((p) => p.textura !== "lana");
+
+  it("hay al menos un gorro de lana y una gorra", () => {
+    expect(gorros.length).toBeGreaterThan(0);
+    expect(gorras.length).toBeGreaterThan(0);
+  });
+
+  it("el gorro de lana lleva estacion invierno; la gorra no está atada a una estación", () => {
+    expect(gorros.every((p) => p.estacion === "invierno")).toBe(true);
+    expect(gorras.every((p) => !p.estacion)).toBe(true);
+  });
 });

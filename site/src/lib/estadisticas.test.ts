@@ -38,6 +38,8 @@ function mkPrenda(
     color2_l: null,
     corte_calzado: "zapatilla_urbana",
     calce: "regular",
+    cuello: null,
+    manga: null,
     necesita_cambio: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

@@ -213,6 +213,8 @@ export default function Recomendaciones() {
             color2={base.color2_hex}
             corteCalzado={base.corte_calzado}
             calce={base.calce}
+            cuello={base.cuello}
+            manga={base.manga}
           />
         </span>
         <div style={{ flex: 1 }}>
@@ -342,6 +344,8 @@ export default function Recomendaciones() {
                         color2={prenda.color2_hex}
                         corteCalzado={prenda.corte_calzado}
                         calce={prenda.calce}
+                        cuello={prenda.cuello}
+                        manga={prenda.manga}
                       />
                     </span>
                     <div style={{ flex: 1, textAlign: "left" }}>

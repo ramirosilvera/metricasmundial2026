@@ -68,6 +68,51 @@ export type Estacion = "verano" | "invierno" | "entretiempo";
  *  99% del catálogo hasta ahora). */
 export type Patron = "liso" | "rayas" | "cuadros";
 
+/** Forma del cuello/escote -- solo tiene sentido en categoria="remera" y
+ *  categoria="sweater" (el resto la ignora). Ronda de completitud del
+ *  catálogo (pedido explícito del usuario: "revisá todas las prendas del
+ *  catálogo, decime si está completo o se puede completar aún más"),
+ *  revisada como modista y asesor de imagen: dos huecos reales que este
+ *  campo resuelve a la vez.
+ *
+ *  1. "sweater-cuello-alto-negro" ya existía en el catálogo con ESE
+ *     nombre, pero no había ningún dato que lo distinguiera de un sweater
+ *     cuello redondo/V real -- se dibujaba exactamente igual que
+ *     cualquier otro. El nombre prometía un cuello alto (turtleneck) que
+ *     el ícono/maniquí nunca mostraban.
+ *  2. La chomba/polo (remera con cuello camisero abrochado, dos o tres
+ *     botones) no tenía forma de representarse: hasta esta ronda toda
+ *     remera del catálogo era, a los ojos del motor de dibujo, un cuello
+ *     redondo liso.
+ *
+ *  "polo" solo tiene sentido real en remera (no existe un "sweater polo"
+ *  de uso común); "alto" solo en sweater (un cuello alto de punto fino es
+ *  un sweater, no una remera). Nullable en vez de un default único (a
+ *  diferencia de patron/calce/corte_calzado) porque el fallback correcto
+ *  DIFIERE por categoría: sin dato, una remera sigue leyéndose "redondo"
+ *  (el corte real más común) y un sweater sigue leyéndose "v" (el
+ *  arquetipo de sweater de oficina que ya cubre casi todo el catálogo) --
+ *  un único default global rompería uno de los dos sin que el usuario
+ *  cargara nada nuevo. Ver el fallback explícito por categoría en
+ *  PrendaIcon.tsx/Maniqui.tsx. */
+export type Cuello = "redondo" | "v" | "polo" | "alto";
+
+/** Largo de manga -- solo tiene sentido en categoria="camisa" y
+ *  categoria="sweater" (el resto la ignora). Mismo pedido de completitud
+ *  del catálogo que Cuello arriba. "corta" en camisa cubre la camisa de
+ *  verano/oficina de manga corta, un básico real que faltaba tanto como
+ *  el chaleco. "sin_mangas" en sweater es justamente el chaleco/sweater
+ *  vest -- una prenda de sastrería real y distinta (se usa sola sobre una
+ *  camisa, o bajo un saco en invierno), no una variante menor de "sweater
+ *  con mangas cortas" (eso no existe como prenda real). "sin_mangas" no
+ *  se ofrece en camisa -- una "camisa sin mangas" no es una prenda real de
+ *  este guardarropa. Nullable por el mismo motivo que Cuello: el fallback
+ *  correcto (manga larga) es el mismo en las dos categorías, así que en
+ *  la práctica se podría haber puesto default 'larga' -- se deja nullable
+ *  igual, por consistencia con Cuello y porque son los mismos dos campos
+ *  que se agregan en la misma migración. */
+export type Manga = "corta" | "larga" | "sin_mangas";
+
 /** Corte/decoración real del calzado -- pedido explícito del usuario:
  *  "dale más detalles a las zapatillas... las deportivas que tienen 3
  *  rayas, o las urbanas tmb... revisa todos los estilos... las costuras,
@@ -112,8 +157,15 @@ export type Patron = "liso" | "rayas" | "cuadros";
  *    (con jean). Sin `estacion` cargada, igual que el resto del calzado:
  *    un botín se usa de otoño a primavera, no solo con frío extremo.
  *  Default "zapatilla_urbana": preserva el dibujo de todo el catálogo
- *  anterior (100% zapatillas urbanas hasta esta revisión). */
-export type CorteCalzado = "zapatilla_urbana" | "zapatilla_running" | "zapato_vestir" | "mocasin" | "zapatilla_lona" | "botin";
+ *  anterior (100% zapatillas urbanas hasta esta revisión).
+ *  - "sandalia" (casual, verano): sin capellada -- tiras cruzando el
+ *    empeine y el talón, dedos al aire. El otro corte (junto con el
+ *    botín) que cambia la SILUETA y no solo la decoración, agregado en la
+ *    misma ronda de completitud del catálogo: los cinco cortes anteriores
+ *    (incluido el botín, que es justo lo opuesto) cubrían frío/entretiempo
+ *    pero no el calzado real de un verano de calle -- un guardarropa real
+ *    no usa zapatilla cerrada con bermuda en pleno enero. */
+export type CorteCalzado = "zapatilla_urbana" | "zapatilla_running" | "zapato_vestir" | "mocasin" | "zapatilla_lona" | "botin" | "sandalia";
 
 /** Calce/silueta real de la prenda -- auditoría de sastrería (Consejo,
  *  ronda de auditoría del motor): tercer eje de un conjunto, después del
@@ -186,7 +238,13 @@ export interface Prenda {
    *  cinturón, corbata y bufanda con el mismo ícono. Default 'cintura'
    *  preserva el dibujo original (el único que existía antes de esta
    *  columna). */
-  posicion_accesorio: "cuello" | "cintura";
+  // 'cabeza' -- ronda de completitud del catálogo (pedido explícito del
+  // usuario: "revisá todas las prendas del catálogo, decime si está
+  // completo"), revisada como modista y asesor de imagen: un gorro de
+  // lana o una gorra no son ni cuello ni cintura, y hasta esta ronda no
+  // tenían dónde dibujarse -- la única prenda de cabeza posible en el
+  // catálogo era, literalmente, no tener ninguna.
+  posicion_accesorio: "cuello" | "cintura" | "cabeza";
   /** Detalle real de la prenda, solo tiene sentido en categoria="buzo" (el
    *  resto la ignora) -- pedido explícito del usuario, revisado como
    *  modista/ingeniero textil: no todos los buzos son hoodie. Antes de esta
@@ -201,6 +259,17 @@ export interface Prenda {
    *  los llamaría de invierno o de entretiempo" a diferencia de sweater/
    *  campera, que sí se tagean por estación (ver catalogo.ts). */
   con_capucha: boolean;
+  /** Ver Cuello arriba. Solo aplica visualmente a categoria="remera" y
+   *  categoria="sweater" (el resto la ignora). Nullable -- ver el porqué
+   *  en el comentario largo de Cuello: el fallback correcto (redondo en
+   *  remera, v en sweater) difiere por categoría, así que un único
+   *  default de columna rompería una de las dos. */
+  cuello: Cuello | null;
+  /** Ver Manga arriba. Solo aplica visualmente a categoria="camisa" y
+   *  categoria="sweater" (el resto la ignora). Nullable por consistencia
+   *  con Cuello -- el fallback (manga larga) es el mismo en las dos
+   *  categorías. */
+  manga: Manga | null;
   /** Estampado real de la prenda (ver Patron arriba) -- default "liso".
    *  Cuando no es "liso", `color2_*` es el segundo color del estampado
    *  (el color de las rayas/los cuadros sobre `color_hex`, que sigue
@@ -305,7 +374,24 @@ export function descripcionPrenda(p: Prenda): string {
     if (p.textura === "algodon" && esPantalon) return p.estilo === "clasico" ? "Pantalón chino" : "Jogger";
   }
   if (p.categoria === "buzo") return p.con_capucha ? "Buzo con capucha" : "Buzo sin capucha";
-  if (p.categoria === "sweater" && p.textura && p.textura !== "lana") return "Sweater liviano";
+  // chomba/polo -- ver Cuello en types.ts (ronda de completitud del
+  // catálogo). Antes de esta rama, cualquier remera caía en el genérico
+  // "Remera" sin excepción -- una chomba con cuello camisero abrochado es
+  // una prenda con nombre propio, no una remera más.
+  if (p.categoria === "remera" && p.cuello === "polo") return "Chomba";
+  if (p.categoria === "sweater") {
+    // chaleco -- ver Manga en types.ts: primero, porque un chaleco de
+    // lana sigue siendo chaleco (la ausencia de mangas es lo que define
+    // la prenda, no la fibra) -- si esta rama fuera después del chequeo
+    // de textura de más abajo, un chaleco de lana caería en el genérico
+    // "Sweater" en vez de nombrarse por lo que es.
+    if (p.manga === "sin_mangas") return "Chaleco";
+    // cuello alto -- ver Cuello en types.ts: "sweater-cuello-alto-negro"
+    // ya existía en el catálogo con ese nombre pero sin ningún dato que lo
+    // distinguiera de un sweater cuello redondo/V; ahora lo tiene.
+    if (p.cuello === "alto") return "Sweater cuello alto";
+    if (p.textura && p.textura !== "lana") return "Sweater liviano";
+  }
   if (p.categoria === "campera") {
     if (p.textura === "denim") return "Campera de jean";
     if (p.textura === "acolchado") return "Campera de pluma";
@@ -328,13 +414,29 @@ export function descripcionPrenda(p: Prenda): string {
   if (p.categoria === "camisa") {
     if (p.patron === "rayas") return "Camisa a rayas";
     if (p.patron === "cuadros") return "Camisa a cuadros";
+    // manga corta -- ver Manga en types.ts, ronda de completitud del
+    // catálogo: después de rayas/cuadros a propósito (el estampado es el
+    // dato más específico cuando los dos están cargados; una camisa a
+    // rayas de manga corta sigue siendo, ante todo, "a rayas").
+    if (p.manga === "corta") return "Camisa manga corta";
   }
   if (p.categoria === "calzado") {
     if (p.corte_calzado === "zapatilla_running") return "Zapatillas running";
     if (p.corte_calzado === "zapato_vestir") return "Zapatos de vestir";
     if (p.corte_calzado === "mocasin") return "Mocasines";
     if (p.corte_calzado === "zapatilla_lona") return "Zapatillas de lona";
+    if (p.corte_calzado === "botin") return "Botines";
+    // sandalia -- ver CorteCalzado en types.ts, ronda de completitud del
+    // catálogo (el calzado de verano que faltaba, contraparte del botín).
+    if (p.corte_calzado === "sandalia") return "Sandalias";
     return "Zapatillas urbanas";
+  }
+  // gorro/gorra -- ver posicion_accesorio en types.ts, ronda de
+  // completitud del catálogo: distinguidos por textura, mismo criterio
+  // real que un sastre usaría (lana = gorro/beanie de invierno; el resto,
+  // típicamente algodón/gabardina, = gorra de visera).
+  if (p.categoria === "accesorio" && p.posicion_accesorio === "cabeza") {
+    return p.textura === "lana" ? "Gorro de lana" : "Gorra";
   }
   const generico = CATEGORIA_LABEL[p.categoria];
   return generico.charAt(0).toUpperCase() + generico.slice(1);

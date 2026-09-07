@@ -4,7 +4,7 @@ import { hexToHsl, hslToHex } from "../lib/color";
 import { procesarFoto } from "../lib/photo";
 import { CATALOGO_PRENDAS, type PresetPrenda } from "../lib/catalogo";
 import { ESTILO_LABEL } from "../lib/recommend";
-import { CATEGORIA_LABEL, type Calce, type Categoria, type CorteCalzado, type Estacion, type Estilo, type Ocasion, type Patron, type Textura } from "../lib/types";
+import { CATEGORIA_LABEL, type Calce, type Categoria, type CorteCalzado, type Cuello, type Estacion, type Estilo, type Manga, type Ocasion, type Patron, type Textura } from "../lib/types";
 import CatalogoPicker from "./CatalogoPicker";
 import ConfigWarning from "./ConfigWarning";
 
@@ -60,6 +60,11 @@ const CATEGORIAS_CON_CALCE: Categoria[] = [
   "campera",
   "saco",
 ];
+// Ver Cuello/Manga en types.ts, ronda de completitud del catálogo -- solo
+// tienen sentido en las categorías que de verdad varían por cuello/manga
+// (calzado/accesorio/pantalón, etc. ni tienen el concepto).
+const CATEGORIAS_CON_CUELLO: Categoria[] = ["remera", "sweater"];
+const CATEGORIAS_CON_MANGA: Categoria[] = ["camisa", "sweater"];
 
 /** Prefill que dejan "Probar antes de comprar" y las sugerencias "para
  *  comprar" de Outfits al decidir cargar la prenda de verdad. `presetId`
@@ -90,7 +95,7 @@ export default function PrendaForm() {
   const [estacion, setEstacion] = useState<Estacion | "">(presetDePrefill?.estacion ?? "");
   const [suelaContraste, setSuelaContraste] = useState(presetDePrefill?.suelaContraste ?? false);
   const [requiereCuello, setRequiereCuello] = useState(presetDePrefill?.requiereCuello ?? false);
-  const [posicionAccesorio, setPosicionAccesorio] = useState<"cuello" | "cintura">(
+  const [posicionAccesorio, setPosicionAccesorio] = useState<"cuello" | "cintura" | "cabeza">(
     presetDePrefill?.posicionAccesorio ?? "cintura",
   );
   const [conCapucha, setConCapucha] = useState(presetDePrefill?.conCapucha ?? true);
@@ -119,6 +124,14 @@ export default function PrendaForm() {
   // el único que no tenía ningún dato. Ver Calce en types.ts y
   // chocanEnVolumen en recommend.ts.
   const [calce, setCalce] = useState<Calce>(presetDePrefill?.calce ?? "regular");
+  // cuello/manga -- ver Cuello/Manga en types.ts, ronda de completitud del
+  // catálogo. Nullable en el modelo (a diferencia de calce/corte_calzado,
+  // que tienen un default único de columna): "" acá significa "sin
+  // especificar", igual que textura/estilo/ocasión/estación de arriba --
+  // el fallback real por categoría lo decide el dibujo (PrendaIcon.tsx/
+  // Maniqui.tsx), no este formulario.
+  const [cuello, setCuello] = useState<Cuello | "">(presetDePrefill?.cuello ?? "");
+  const [manga, setManga] = useState<Manga | "">(presetDePrefill?.manga ?? "");
   // necesita_cambio -- pedido explícito del usuario: "que se pueda agregar
   // la opción de que una prenda necesita cambio... todavía es usable pero
   // necesita cambio en breve". Nunca viene precargada de un preset (no
@@ -160,6 +173,8 @@ export default function PrendaForm() {
     setPatron(p.patron ?? "liso");
     setColor2Hex(p.colorHex2);
     setCorteCalzado(p.corteCalzado ?? "zapatilla_urbana");
+    setCuello(p.cuello ?? "");
+    setManga(p.manga ?? "");
     setFotoBlob(null);
     setFotoPreview(null);
   }
@@ -218,6 +233,8 @@ export default function PrendaForm() {
           color2_l: hsl2?.l ?? null,
           corte_calzado: categoria === "calzado" ? corteCalzado : "zapatilla_urbana",
           calce: CATEGORIAS_CON_CALCE.includes(categoria) ? calce : "regular",
+          cuello: CATEGORIAS_CON_CUELLO.includes(categoria) ? cuello || null : null,
+          manga: CATEGORIAS_CON_MANGA.includes(categoria) ? manga || null : null,
           necesita_cambio: necesitaCambio,
         })
         .select()
@@ -354,6 +371,47 @@ export default function PrendaForm() {
                 </select>
               </label>
             )}
+            {categoria === "remera" && (
+              <label className="field-label">
+                <span>Cuello</span>
+                <select className="field" value={cuello} onChange={(e) => setCuello(e.target.value as Cuello | "")}>
+                  <option value="">(sin especificar -- redondo)</option>
+                  <option value="redondo">Redondo (remera lisa)</option>
+                  <option value="polo">Polo (chomba, cuello abrochado)</option>
+                </select>
+              </label>
+            )}
+            {categoria === "sweater" && (
+              <label className="field-label">
+                <span>Cuello</span>
+                <select className="field" value={cuello} onChange={(e) => setCuello(e.target.value as Cuello | "")}>
+                  <option value="">(sin especificar -- V)</option>
+                  <option value="v">Cuello en V</option>
+                  <option value="redondo">Cuello redondo</option>
+                  <option value="alto">Cuello alto (turtleneck)</option>
+                </select>
+              </label>
+            )}
+            {categoria === "camisa" && (
+              <label className="field-label">
+                <span>Manga</span>
+                <select className="field" value={manga} onChange={(e) => setManga(e.target.value as Manga | "")}>
+                  <option value="">(sin especificar -- larga)</option>
+                  <option value="larga">Larga</option>
+                  <option value="corta">Corta</option>
+                </select>
+              </label>
+            )}
+            {categoria === "sweater" && (
+              <label className="field-label">
+                <span>Manga</span>
+                <select className="field" value={manga} onChange={(e) => setManga(e.target.value as Manga | "")}>
+                  <option value="">(sin especificar -- con mangas)</option>
+                  <option value="larga">Con mangas</option>
+                  <option value="sin_mangas">Sin mangas (chaleco)</option>
+                </select>
+              </label>
+            )}
             {categoria === "calzado" && (
               <>
                 <label className="field-label">
@@ -369,6 +427,7 @@ export default function PrendaForm() {
                     <option value="mocasin">Mocasín (sin cordones)</option>
                     <option value="zapatilla_lona">Zapatilla de lona</option>
                     <option value="botin">Botín / bota (caña sobre el tobillo)</option>
+                    <option value="sandalia">Sandalia (sin capellada, de verano)</option>
                   </select>
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -390,10 +449,17 @@ export default function PrendaForm() {
                   <select
                     className="field"
                     value={posicionAccesorio}
-                    onChange={(e) => setPosicionAccesorio(e.target.value as "cuello" | "cintura")}
+                    onChange={(e) => setPosicionAccesorio(e.target.value as "cuello" | "cintura" | "cabeza")}
                   >
                     <option value="cintura">Cintura (cinturón)</option>
                     <option value="cuello">Cuello (corbata, bufanda)</option>
+                    {/* "cabeza" faltaba en este select -- bug real
+                        encontrado en la ronda de completitud del catálogo:
+                        el gorro/gorra recién agregados (ver
+                        posicion_accesorio en types.ts) no tenían forma de
+                        cargarse a mano, solo eligiendo el preset del
+                        catálogo. */}
+                    <option value="cabeza">Cabeza (gorro, gorra)</option>
                   </select>
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

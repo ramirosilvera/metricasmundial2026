@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { detalleHsl, hexToHsl, tonoTexturaHsl } from "../lib/color";
-import type { Calce, Categoria, CorteCalzado, Estacion, Patron, Textura } from "../lib/types";
+import type { Calce, Categoria, CorteCalzado, Cuello, Estacion, Manga, Patron, Textura } from "../lib/types";
 
 /** "Campera sweater" -- cardigan de punto CON cierre (categoria="campera",
  *  textura="lana", ver "campera-sweater-azul-marino" en catalogo.ts), no
@@ -391,6 +391,8 @@ export function PrendaShape({
   color2,
   corteCalzado = "zapatilla_urbana",
   calce,
+  cuello,
+  manga,
 }: {
   categoria: Categoria;
   color: string;
@@ -422,7 +424,7 @@ export function PrendaShape({
    *  exactamente el mismo ícono (una tira con hebilla) porque el switch de
    *  abajo solo distinguía por categoria, no por qué accesorio era en
    *  realidad -- así lo reportó un usuario viendo el selector real. */
-  posicionAccesorio?: "cuello" | "cintura";
+  posicionAccesorio?: "cuello" | "cintura" | "cabeza";
   /** Ver Prenda.requiere_cuello en types.ts. Junto con posicionAccesorio
    *  distingue una corbata (cuello + requiere_cuello) de una bufanda
    *  (cuello, sin requiere_cuello) -- ambas van al cuello pero se ven, y se
@@ -453,6 +455,14 @@ export function PrendaShape({
    *  las dos con textura algodón. Sin calce cargado no dibuja el puño --
    *  no se inventa un corte que la prenda no tiene marcado. */
   calce?: Calce | null;
+  /** Ver Cuello en types.ts. Solo afecta a "remera" ("polo", la chomba) y
+   *  "sweater" ("alto"/"redondo"/"v") -- sin dato, cada categoría cae en
+   *  su fallback real (redondo en remera, v en sweater), el mismo criterio
+   *  ya documentado en el enum. */
+  cuello?: Cuello | null;
+  /** Ver Manga en types.ts. Solo afecta a "camisa" ("corta") y "sweater"
+   *  ("sin_mangas", el chaleco) -- sin dato, cae en "larga" en las dos. */
+  manga?: Manga | null;
 }) {
   const stroke = "rgba(0,0,0,0.15)";
   const soleClipId = useId();
@@ -545,11 +555,35 @@ export function PrendaShape({
             // es lo que la distingue del sweater, que sí conserva su V
             // (el escote en V es un arquetipo real de sweater, no de
             // remera).
-            d="M22 8 Q32 17 42 8 L54 16 L47 26 L42 22 L42 56 L22 56 L22 22 L17 26 L10 16 Z"
+            //
+            // cuello "polo" (chomba) -- ronda de completitud del catálogo
+            // (ver Cuello en types.ts). Mismo cuerpo/mangas que la remera:
+            // lo único que cambia es un escote más cerrado (menos abierto
+            // que el crew redondo, dejando lugar al cuello camisero) y la
+            // decoración de acá abajo (cuello + placket + botones).
+            d={
+              cuello === "polo"
+                ? "M24 8 L32 12 L40 8 L54 16 L47 26 L42 22 L42 56 L22 56 L22 22 L17 26 L10 16 Z"
+                : "M22 8 Q32 17 42 8 L54 16 L47 26 L42 22 L42 56 L22 56 L22 22 L17 26 L10 16 Z"
+            }
             fill={conEstampado ? estampadoUrl! : color}
             stroke={stroke}
             patron={conEstampado ? undefined : patron}
           />
+          {cuello === "polo" && (
+            // Cuello de punto (más chato que el cuello camisero armado de
+            // "camisa" más abajo -- un polo real se cose en tejido, sin la
+            // rigidez de una entretela) + placket corto de 2 botones -- las
+            // dos señas que distinguen una chomba de una remera lisa a
+            // simple vista.
+            <>
+              <path d="M24 8 L32 15 L28 8.5 Z" fill={tonoDetalle} stroke={stroke} strokeWidth={0.5} />
+              <path d="M40 8 L32 15 L36 8.5 Z" fill={tonoDetalle} stroke={stroke} strokeWidth={0.5} />
+              <line x1="32" y1="15" x2="32" y2="25" stroke={stroke} strokeWidth={0.6} />
+              <circle cx="32" cy="18" r="0.8" fill={tonoDetalle} />
+              <circle cx="32" cy="22" r="0.8" fill={tonoDetalle} />
+            </>
+          )}
           {esRemeraDeportiva(categoria, textura) && (
             <>
               <line x1="36" y1="10" x2="42" y2="22" stroke={tonoDetalle} strokeWidth={1} />
@@ -602,6 +636,20 @@ export function PrendaShape({
       // Los botones y los puños son el otro par de señas que ninguna
       // remera/buzo tiene: una camisa real se abrocha al frente y termina
       // en un puño, no en un ruedo de manga suelto.
+      //
+      // manga "corta" (ver Manga en types.ts, ronda de completitud del
+      // catálogo) NO cambia este ícono a propósito: a esta escala
+      // (~48-64px) TODO torso -- remera, camisa, buzo, sweater -- ya
+      // comparte el mismo sleeve-stub corto por límite de espacio, sin
+      // modelar largo de manga real (ver el comentario de esRemeraDeportiva
+      // más arriba). Cambiarlo solo para camisa manga corta rompería esa
+      // consistencia sin ganar legibilidad real -- la distinción que sí
+      // importa (mangas hasta la muñeca vs. hasta el codo) se ve recién en
+      // el maniquí grande (Maniqui.tsx), que tiene brazo entero para
+      // mostrarla. El chaleco (sweater sin mangas, ver el caso "sweater"
+      // más abajo) es la excepción real: ahí la diferencia es NO tener
+      // ningún sleeve, no un largo distinto, y eso sí se nota de un
+      // vistazo aunque el ícono sea chico.
       forma = (
         <>
           <FormaConTextura
@@ -647,14 +695,55 @@ export function PrendaShape({
         </>
       );
       break;
-    case "sweater":
+    case "sweater": {
+      // Cuello (redondo/v/alto) y manga (con mangas/chaleco) -- ronda de
+      // completitud del catálogo (ver Cuello/Manga en types.ts), revisada
+      // como modista: hasta esta ronda "sweater-cuello-alto-negro" existía
+      // en el catálogo con ese nombre pero se dibujaba EXACTAMENTE igual
+      // que cualquier otro sweater -- el nombre prometía un dato que el
+      // ícono nunca mostraba, mismo hallazgo que ya motivó el cuello real
+      // de "camisa" más arriba.
+      const esChaleco = manga === "sin_mangas";
+      // Sin mangas -- un chaleco real no tiene sleeve para nada, ni
+      // siquiera el stub corto que comparten remera/camisa/buzo a esta
+      // escala: el cuerpo se angosta directo del hombro al costado, sin la
+      // punta diagonal que sugiere una manga. Es la única diferencia de
+      // SILUETA (no solo de decoración) que impone `manga` acá -- por eso
+      // vale la pena en el ícono chico, a diferencia de "camisa manga
+      // corta" (ver el comentario de manga corta más arriba, en el caso
+      // "camisa"): un chaleco sin mangas de ningún tipo se distingue de un
+      // vistazo, una manga un poco más corta no, a este tamaño.
+      const cuerpo = esChaleco ? "M22 8 L32 13 L42 8 L42 58 L22 58 Z" : "M22 8 L32 13 L42 8 L53 17 L46 27 L42 23 L42 58 L22 58 L22 23 L18 27 L11 17 Z";
+      let escote: React.ReactNode;
+      switch (cuello) {
+        case "redondo":
+          escote = <path d="M22 8 Q32 17 42 8" fill="none" stroke={stroke} />;
+          break;
+        case "alto":
+          // banda alta cubriendo el cuello -- la seña real de un
+          // turtleneck, ninguna otra prenda del catálogo la lleva. Encima
+          // del escote (que queda casi tapado, apenas una línea de base
+          // más chata que el V default) para que se lea como tela
+          // enrollada, no como un cuello abierto con un rectángulo flotando.
+          escote = (
+            <>
+              <path d="M24 8 L32 11 L40 8" fill="none" stroke={stroke} />
+              <RectConTextura x={26} y={2} width={12} height={8} rx={2} fill={color} stroke={stroke} patron={patron} />
+            </>
+          );
+          break;
+        case "v":
+        default:
+          escote = <path d="M25 8 L32 12 L39 8" fill="none" stroke={stroke} />;
+      }
       forma = (
         <>
-          <FormaConTextura d="M22 8 L32 13 L42 8 L53 17 L46 27 L42 23 L42 58 L22 58 L22 23 L18 27 L11 17 Z" fill={color} stroke={stroke} patron={patron} />
-          <path d="M25 8 L32 12 L39 8" fill="none" stroke={stroke} />
+          <FormaConTextura d={cuerpo} fill={color} stroke={stroke} patron={patron} />
+          {escote}
         </>
       );
       break;
+    }
     case "pantalon":
       // jean/vestir/jogger -- ver esJean/esPantalonDeVestir/esJogger más
       // arriba. Antes esta silueta era una sola para cualquier pantalón,
@@ -730,10 +819,19 @@ export function PrendaShape({
       // tobillo. Misma puntera y misma suela que el resto -- es el mismo
       // pie -- pero atrás, donde los demás cortes bajan al talón (y=26-34),
       // acá sube una caña hasta y=10.
+      // La sandalia es el otro corte (junto con el botín) que cambia la
+      // SILUETA entera y no solo la decoración -- ver CorteCalzado en
+      // types.ts, ronda de completitud del catálogo: sin capellada
+      // cerrada, la silueta es apenas la suela chata (mismo alto que el
+      // tramo inferior del resto de los cortes, y=41 a 50 contra 44 a 50)
+      // -- el dedo queda literalmente afuera del dibujo, no tapado por un
+      // trazo que sugiera piel.
       const d =
         corteCalzado === "botin"
           ? "M8 44 Q8 36 18 34 L34 30 Q40 26 44 26 L44 10 L58 10 L58 44 Q58 50 52 50 L12 50 Q8 50 8 44 Z"
-          : "M8 44 Q8 36 18 34 L34 30 Q40 24 48 26 L52 34 Q58 36 58 44 Q58 50 52 50 L12 50 Q8 50 8 44 Z";
+          : corteCalzado === "sandalia"
+            ? "M8 46 Q8 42 12 41 L54 41 Q58 43 58 46 Q58 50 52 50 L12 50 Q8 50 8 46 Z"
+            : "M8 44 Q8 36 18 34 L34 30 Q40 24 48 26 L52 34 Q58 36 58 44 Q58 50 52 50 L12 50 Q8 50 8 44 Z";
       const base = <FormaConTextura d={d} fill={color} stroke={stroke} patron={patron} />;
       // Suela de contraste: se recorta el mismo silueta con un clip
       // rectangular en la franja inferior -- así el borde de la suela sigue
@@ -812,6 +910,22 @@ export function PrendaShape({
               {[14, 19, 24].map((y) => (
                 <line key={y} x1="46.5" y1={y} x2="55.5" y2={y} stroke={tonoDetalle} strokeWidth={1} strokeLinecap="round" />
               ))}
+            </>
+          );
+          break;
+        case "sandalia":
+          // dos tiras cruzando la suela, del mismo color/material que la
+          // suela (una sandalia de cuero real es una única pieza de
+          // cuero) -- separadas del cuerpo por su propio `stroke`, mismo
+          // criterio que ya distingue capas del mismo color en el resto
+          // del ícono (ej. las solapas del saco). Deja un hueco entre el
+          // extremo izquierdo (el dedo, sin ninguna tira encima) y la
+          // primera tira -- es justamente esa apertura la que lee
+          // "sandalia" y no "zapato chato".
+          decoracion = (
+            <>
+              <path d="M18 41 Q26 22 34 41 Q26 34 18 41 Z" fill={color} stroke={stroke} strokeWidth={0.6} />
+              <path d="M38 41 Q46 20 54 41 Q46 32 38 41 Z" fill={color} stroke={stroke} strokeWidth={0.6} />
             </>
           );
           break;
@@ -943,7 +1057,33 @@ export function PrendaShape({
     }
     case "accesorio":
     default: {
-      if (posicionAccesorio !== "cuello") {
+      if (posicionAccesorio === "cabeza") {
+        // Gorro/gorra -- ronda de completitud del catálogo (ver
+        // posicion_accesorio en types.ts): antes de esta rama, "cabeza"
+        // caía en el `!== "cuello"` de más abajo y se dibujaba como un
+        // CINTURÓN -- un gorro de lana se veía en el selector como una
+        // tira con hebilla. Distinguidos por textura, mismo criterio real
+        // que descripcionPrenda (types.ts): lana = gorro/beanie (dome +
+        // banda doblada, sin visera); el resto = gorra de visera.
+        forma =
+          textura === "lana" ? (
+            <>
+              <FormaConTextura d="M16 30 Q16 8 32 8 Q48 8 48 30 Z" fill={color} stroke={stroke} patron={patron} />
+              {/* banda doblada -- el dobladillo grueso de un gorro de
+                  lana real, más oscuro/claro que el resto (mismo criterio
+                  de contraste que tonoDetalle usa en todo el ícono). */}
+              <RectConTextura x={14} y={23} width={36} height={9} rx={4} fill={tonoDetalle} stroke={stroke} />
+            </>
+          ) : (
+            <>
+              <FormaConTextura d="M16 27 Q16 8 32 8 Q48 8 48 27 Z" fill={color} stroke={stroke} patron={patron} />
+              {/* visera -- la seña real que distingue una gorra de un
+                  gorro, sin ambigüedad. */}
+              <FormaConTextura d="M44 24 Q59 23 61 29 Q58 32 44 30 Z" fill={color} stroke={stroke} patron={patron} />
+              <circle cx="32" cy="9" r="1.3" fill={tonoDetalle} />
+            </>
+          );
+      } else if (posicionAccesorio !== "cuello") {
         // Cinturón: tira horizontal a la altura de la cintura, con hebilla.
         // Forma original, sin cambios -- sigue siendo la única lectura
         // correcta para un accesorio que se usa en la cintura. La hebilla
@@ -1001,19 +1141,23 @@ export default function PrendaIcon({
   color2,
   corteCalzado,
   calce,
+  cuello,
+  manga,
 }: {
   categoria: Categoria;
   color: string;
   textura?: Textura;
   estacion?: Estacion | null;
   suelaContraste?: boolean;
-  posicionAccesorio?: "cuello" | "cintura";
+  posicionAccesorio?: "cuello" | "cintura" | "cabeza";
   requiereCuello?: boolean;
   conCapucha?: boolean;
   patron?: Patron;
   color2?: string | null;
   corteCalzado?: CorteCalzado;
   calce?: Calce | null;
+  cuello?: Cuello | null;
+  manga?: Manga | null;
 }) {
   return (
     <svg viewBox="0 0 64 64" width="100%" height="100%">
@@ -1030,6 +1174,8 @@ export default function PrendaIcon({
         color2={color2}
         corteCalzado={corteCalzado}
         calce={calce}
+        cuello={cuello}
+        manga={manga}
       />
     </svg>
   );
