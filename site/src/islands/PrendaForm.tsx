@@ -65,6 +65,17 @@ const CATEGORIAS_CON_CALCE: Categoria[] = [
 // (calzado/accesorio/pantalón, etc. ni tienen el concepto).
 const CATEGORIAS_CON_CUELLO: Categoria[] = ["remera", "sweater"];
 const CATEGORIAS_CON_MANGA: Categoria[] = ["camisa", "sweater"];
+// Ver Patron en types.ts. Bug real encontrado en la ronda del buzo
+// color-block (pedido explícito del usuario, con foto): el submit de acá
+// abajo solo guardaba patron/color2_hex cuando categoria==="camisa" --
+// hardcodeado desde la ronda de "camisas ralladas", cuando camisa era la
+// única categoría con un patrón real. remera ya tenía uno propio desde
+// "remera-rayas-marina" (nunca se guardaba bien) y ahora el buzo
+// color-block suma un tercero -- sin esta lista, elegir cualquiera de los
+// dos presets desde el catálogo y guardarlo perdía el patrón/color2/
+// color3 en silencio (quedaba "liso" en la base, aunque el preset elegido
+// no lo fuera).
+const CATEGORIAS_CON_PATRON: Categoria[] = ["camisa", "remera", "buzo"];
 
 /** Prefill que dejan "Probar antes de comprar" y las sugerencias "para
  *  comprar" de Outfits al decidir cargar la prenda de verdad. `presetId`
@@ -107,6 +118,7 @@ export default function PrendaForm() {
   // -- se perdía el color2/patron en el insert de abajo.
   const [patron, setPatron] = useState<Patron>(presetDePrefill?.patron ?? "liso");
   const [color2Hex, setColor2Hex] = useState<string | undefined>(presetDePrefill?.colorHex2);
+  const [color3Hex, setColor3Hex] = useState<string | undefined>(presetDePrefill?.colorHex3);
   // corte_calzado -- select manual agregado en la auditoría de sastrería
   // (Consejo, ronda siguiente): hasta esta ronda solo se cargaba eligiendo
   // un preset del catálogo (no había <select> en el bloque
@@ -172,6 +184,7 @@ export default function PrendaForm() {
     setConCapucha(p.conCapucha ?? true);
     setPatron(p.patron ?? "liso");
     setColor2Hex(p.colorHex2);
+    setColor3Hex(p.colorHex3);
     setCorteCalzado(p.corteCalzado ?? "zapatilla_urbana");
     setCuello(p.cuello ?? "");
     setManga(p.manga ?? "");
@@ -207,7 +220,9 @@ export default function PrendaForm() {
       }
 
       const hsl = hexToHsl(colorHex);
-      const hsl2 = categoria === "camisa" && color2Hex ? hexToHsl(color2Hex) : null;
+      const conPatron = CATEGORIAS_CON_PATRON.includes(categoria);
+      const hsl2 = conPatron && color2Hex ? hexToHsl(color2Hex) : null;
+      const hsl3 = conPatron && color3Hex ? hexToHsl(color3Hex) : null;
       const { data: inserted, error: insertErr } = await supabase
         .from("prendas")
         .insert({
@@ -226,11 +241,15 @@ export default function PrendaForm() {
           requiere_cuello: categoria === "accesorio" ? requiereCuello : false,
           posicion_accesorio: categoria === "accesorio" ? posicionAccesorio : "cintura",
           con_capucha: categoria === "buzo" ? conCapucha : true,
-          patron: categoria === "camisa" ? patron : "liso",
-          color2_hex: categoria === "camisa" ? (color2Hex ?? null) : null,
+          patron: conPatron ? patron : "liso",
+          color2_hex: conPatron ? (color2Hex ?? null) : null,
           color2_h: hsl2?.h ?? null,
           color2_s: hsl2?.s ?? null,
           color2_l: hsl2?.l ?? null,
+          color3_hex: conPatron ? (color3Hex ?? null) : null,
+          color3_h: hsl3?.h ?? null,
+          color3_s: hsl3?.s ?? null,
+          color3_l: hsl3?.l ?? null,
           corte_calzado: categoria === "calzado" ? corteCalzado : "zapatilla_urbana",
           calce: CATEGORIAS_CON_CALCE.includes(categoria) ? calce : "regular",
           cuello: CATEGORIAS_CON_CUELLO.includes(categoria) ? cuello || null : null,

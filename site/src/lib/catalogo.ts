@@ -33,6 +33,10 @@ export interface PresetPrenda {
    *  obligatorio en la práctica cuando `patron` no es "liso", si no no hay
    *  con qué dibujar el estampado real. */
   colorHex2?: string;
+  /** Tercer color, solo lo usa patron="bloques" (ver Prenda.color3_* en
+   *  types.ts) -- opcional incluso ahí, un color-block de 2 tonos se
+   *  resuelve con colorHex2 solo. */
+  colorHex3?: string;
   /** Ver CorteCalzado en types.ts. Solo tiene sentido en categoria="calzado";
    *  se omite (== "zapatilla_urbana") en el resto de las categorías. */
   corteCalzado?: CorteCalzado;
@@ -613,6 +617,56 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // crewneck de cada peso.
   { id: "buzo-crewneck-gris", nombre: "Buzo crewneck gris (sin capucha)", categoria: "buzo", colorHex: "#8C8C8C", textura: "frisado", estilo: "casual", ocasion: "casual", conCapucha: false, estacion: "invierno" },
   { id: "buzo-crewneck-azul-marino", nombre: "Buzo crewneck azul marino (sin capucha)", categoria: "buzo", colorHex: "#1F2A44", textura: "tejido_grueso", estilo: "casual", ocasion: "casual", conCapucha: false, estacion: "entretiempo" },
+
+  // --- Buzo color-block -- pedido explícito del usuario con foto real
+  // (revisado como sastre, ingeniero textil, asesor de imagen/moda,
+  // modista): "es un buzo de entretiempo. Presta atención a la
+  // combinación de colores". Hueco real de tipo de decoración, no solo de
+  // color: hasta esta ronda el catálogo tenía estampados repetidos
+  // (rayas/cuadros, ver Patron en types.ts) pero ningún color-block --
+  // una prenda cortada y cosida en paneles de tela de colores sólidos
+  // GRANDES, sin ninguna repetición, un archetype real y distinto (no una
+  // variante de rayas con la raya más ancha). Ver PatronBloques en
+  // PrendaIcon.tsx para el porqué necesitaba su propio mecanismo de
+  // dibujo.
+  //
+  // 3 colores, muestreados de la foto real (no inventados): banda
+  // superior greige #B6AB99 (un beige-gris apagado, más frío y menos
+  // saturado que el "Beige" #D8C7A1 que ya usa el resto del catálogo --
+  // son dos beige reales distintos, no el mismo tono repetido), banda
+  // media crema #E4DDCC (un paso más claro, mismo matiz cálido que el
+  // greige pero mucho menos croma), banda inferior blanco roto #F5F5F0
+  // (reusa el mismo hex que ya usan las zapatillas de lona blancas --
+  // consistencia de paleta, es el mismo "casi blanco" de siempre). Los
+  // tres tonos son parientes cercanos dentro de la misma familia neutra
+  // (greige -> crema -> blanco, un degradé tonal, no un contraste de
+  // colores distintos) -- un color-block real de este tipo se apoya en
+  // gradación de VALOR (claro/oscuro), no en matices que compitan entre
+  // sí, y es justamente lo que hace que las tres bandas de la prenda real
+  // combinen entre sí sin choque, algo que un asesor de color reconoce a
+  // primera vista.
+  //
+  // con_capucha: false -- crew neck real en la foto, sin capucha.
+  // Textura/estación/estilo/ocasión: mismo patrón que buzo-crewneck-azul-
+  // marino (el sibling más cercano, mismo corte crewneck+entretiempo) --
+  // tejido_grueso es la textura real de un French terry/fleece de
+  // entretiempo (no frisado, que es el peso de invierno), casual/casual
+  // es el registro real de un crewneck de calle.
+  {
+    id: "buzo-colorblock-greige",
+    nombre: "Buzo color-block greige",
+    categoria: "buzo",
+    colorHex: "#B6AB99",
+    colorHex2: "#E4DDCC",
+    colorHex3: "#F5F5F0",
+    patron: "bloques",
+    textura: "tejido_grueso",
+    estilo: "casual",
+    ocasion: "casual",
+    conCapucha: false,
+    estacion: "entretiempo",
+  },
+
   // buzo oversize -- auditoría de sastrería (Consejo, ronda de revisión
   // visual del maniquí), pedido explícito del usuario ("revisa en el
   // maniquí cómo quedan las prendas ajustada, regular u holgada... si no
@@ -1368,6 +1422,7 @@ export const CATALOGO_CON_HSL = CATALOGO_PRENDAS.map((p) => ({
   ...p,
   hsl: hexToHsl(p.colorHex),
   hsl2: p.colorHex2 ? hexToHsl(p.colorHex2) : undefined,
+  hsl3: p.colorHex3 ? hexToHsl(p.colorHex3) : undefined,
 }));
 
 /** Convierte un preset del catálogo en una Prenda sintética -- misma forma
@@ -1384,6 +1439,7 @@ export function presetAPrendaSintetica(preset: PresetPrenda & { hsl: { h: number
   // estampado -- mismo hexToHsl que ya usa CATALOGO_CON_HSL para el color
   // principal.
   const hsl2 = preset.colorHex2 ? hexToHsl(preset.colorHex2) : null;
+  const hsl3 = preset.colorHex3 ? hexToHsl(preset.colorHex3) : null;
   return {
     id: `sugerida-${preset.id}`,
     user_id: "",
@@ -1407,6 +1463,10 @@ export function presetAPrendaSintetica(preset: PresetPrenda & { hsl: { h: number
     color2_h: hsl2?.h ?? null,
     color2_s: hsl2?.s ?? null,
     color2_l: hsl2?.l ?? null,
+    color3_hex: preset.colorHex3 ?? null,
+    color3_h: hsl3?.h ?? null,
+    color3_s: hsl3?.s ?? null,
+    color3_l: hsl3?.l ?? null,
     corte_calzado: preset.corteCalzado ?? "zapatilla_urbana",
     calce: preset.calce ?? "regular",
     cuello: preset.cuello ?? null,

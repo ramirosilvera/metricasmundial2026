@@ -26,6 +26,10 @@ function mkPrenda(categoria: Prenda["categoria"], overrides: Partial<Prenda> = {
     color2_h: null,
     color2_s: null,
     color2_l: null,
+    color3_hex: null,
+    color3_h: null,
+    color3_s: null,
+    color3_l: null,
     corte_calzado: "zapatilla_urbana",
     calce: "regular",
     cuello: null,
@@ -114,6 +118,15 @@ describe("descripcionPrenda", () => {
   it("buzo distingue con/sin capucha", () => {
     expect(descripcionPrenda(mkPrenda("buzo", { con_capucha: true }))).toBe("Buzo con capucha");
     expect(descripcionPrenda(mkPrenda("buzo", { con_capucha: false }))).toBe("Buzo sin capucha");
+  });
+
+  // Ronda del buzo color-block (pedido explícito del usuario, con foto de
+  // un buzo real de 3 franjas de color): "bloques" pisa la distinción
+  // con/sin capucha -- un buzo color-block se identifica por su paleta,
+  // no por si tiene capucha (el preset agregado al catálogo no la tiene).
+  it("buzo con patron bloques se identifica como color-block, sin importar la capucha", () => {
+    expect(descripcionPrenda(mkPrenda("buzo", { patron: "bloques", con_capucha: false }))).toBe("Buzo color-block");
+    expect(descripcionPrenda(mkPrenda("buzo", { patron: "bloques", con_capucha: true }))).toBe("Buzo color-block");
   });
 
   it("sweater liviano (no lana) se distingue del sweater de lana genérico", () => {

@@ -7,6 +7,7 @@ import PrendaIcon, {
   esJogger,
   esPantalonDeVestir,
   esRemeraDeportiva,
+  PatronBloques,
   PatronEstampado,
   PatronPanelDeportivo,
   PatronTextura,
@@ -290,6 +291,14 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
     (prenda.categoria === "camisa" || prenda.categoria === "remera") &&
     (prenda.patron === "rayas" || prenda.patron === "cuadros") &&
     !!prenda.color2_hex;
+  // color-block ("bloques", ver PatronBloques en PrendaIcon.tsx) -- pedido
+  // explícito del usuario con foto real (buzo crewneck de entretiempo en
+  // 3 bandas horizontales). Mismo mecanismo que conEstampado de acá
+  // arriba (reemplaza el fill del cuerpo por completo), acotado a "buzo"
+  // -- es la única categoría con una prenda real de este patrón hoy,
+  // mismo criterio de acotar por categoría real que ya usa conEstampado.
+  const bloquesId = `bloques-${prenda.id}`;
+  const conBloques = prenda.categoria === "buzo" && prenda.patron === "bloques" && !!prenda.color2_hex;
   // panel lateral de rayas diagonales + cinta en la manga -- pedido
   // explícito del usuario con foto de referencia real (remera técnica de
   // entrenamiento): "dales un diseño parecido al de la captura adjunta".
@@ -336,6 +345,11 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
                 color2={prenda.color2_hex}
                 horizontal={prenda.categoria === "remera"}
               />
+            </defs>
+          )}
+          {conBloques && prenda.color2_hex && (
+            <defs>
+              <PatronBloques id={bloquesId} color1={prenda.color_hex} color2={prenda.color2_hex} color3={prenda.color3_hex} />
             </defs>
           )}
           {conPanelDeportivo && (
@@ -479,9 +493,9 @@ function TorsoCuerpo({ prenda }: { prenda: Prenda }) {
               valle en el medio. */}
           <Forma
             d="M34 48 Q34 59 37 70 Q39 89 41 104 L41 126 L79 126 L79 104 Q81 89 83 70 Q86 59 86 48 Q78 42 64 46 Q60 48 56 46 Q42 42 34 48 Z"
-            fill={conEstampado ? `url(#${estampadoId})` : fill}
+            fill={conEstampado ? `url(#${estampadoId})` : conBloques ? `url(#${bloquesId})` : fill}
             stroke={stroke}
-            patron={conEstampado ? undefined : patron}
+            patron={conEstampado || conBloques ? undefined : patron}
             sugerida={sugerida}
           />
 
@@ -1502,7 +1516,7 @@ export default function Maniqui({ prendas }: { prendas: Prenda[] }) {
                   saco -- sin esto, una camisa a rayas puesta bajo un saco se
                   veía plana (luzHsl liso) en la única parte del cuerpo
                   donde el estampado real seguiría siendo visible. */}
-              {cuelloSecundario.patron !== "liso" && cuelloSecundario.color2_hex && (
+              {(cuelloSecundario.patron === "rayas" || cuelloSecundario.patron === "cuadros") && cuelloSecundario.color2_hex && (
                 <PatronEstampado
                   id={`estampado-cuello-${cuelloSecundario.id}`}
                   patron={cuelloSecundario.patron}

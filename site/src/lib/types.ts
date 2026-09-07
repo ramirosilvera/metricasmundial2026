@@ -65,8 +65,22 @@ export type Estacion = "verano" | "invierno" | "entretiempo";
  *  pasada porque ya existía una prenda en el catálogo (camisa-cuadros)
  *  nombrada "a cuadros" sin ningún estampado real dibujado -- el nombre
  *  prometía algo que el ícono/maniquí nunca mostraban. Default "liso" (el
- *  99% del catálogo hasta ahora). */
-export type Patron = "liso" | "rayas" | "cuadros";
+ *  99% del catálogo hasta ahora).
+ *
+ *  "bloques" -- pedido explícito del usuario con foto real (un buzo
+ *  crewneck de entretiempo cortado en 3 bandas horizontales de color
+ *  sólido: greige arriba, crema al medio, blanco abajo -- "presta atención
+ *  a la combinación de colores"). Es una prenda real DISTINTA de rayas/
+ *  cuadros, no una variante: un color-block es la prenda cortada y cosida
+ *  en paneles de tela de colores sólidos (paneles grandes, sin repetición
+ *  ninguna), mientras que rayas/cuadros son un estampado real (una trama
+ *  chica que SÍ se repite, impresa o tejida). Confundirlos en el dibujo
+ *  -- ver PatronBloques en PrendaIcon.tsx -- se nota: una rayada fina no
+ *  se lee como panel grande de color, se lee como una rayada más. Usa
+ *  `color2_*` igual que rayas/cuadros, y además `color3_*` (ver más abajo)
+ *  para el tercer panel -- opcional, un color-block de 2 tonos se resuelve
+ *  con color2 solo. */
+export type Patron = "liso" | "rayas" | "cuadros" | "bloques";
 
 /** Forma del cuello/escote -- solo tiene sentido en categoria="remera" y
  *  categoria="sweater" (el resto la ignora). Ronda de completitud del
@@ -280,6 +294,14 @@ export interface Prenda {
   color2_h: number | null;
   color2_s: number | null;
   color2_l: number | null;
+  /** Tercer color, solo lo usa "bloques" (ver Patron arriba) -- el tercer
+   *  panel de un color-block de 3 tonos. Nullable e independiente de
+   *  color2_*: un color-block de 2 tonos deja esto en null y se resuelve
+   *  con color2 solo (ver PatronBloques en PrendaIcon.tsx). */
+  color3_hex: string | null;
+  color3_h: number | null;
+  color3_s: number | null;
+  color3_l: number | null;
   /** Ver CorteCalzado arriba. Solo aplica visualmente a categoria="calzado"
    *  (el resto la ignora, mismo criterio que con_capucha/suela_contraste). */
   corte_calzado: CorteCalzado;
@@ -397,7 +419,13 @@ export function descripcionPrenda(p: Prenda): string {
     // mismo nombre para las dos.
     if (p.textura === "pana" || p.textura === "corderoy") return esPantalon ? "Pantalón de pana" : "Bermuda de pana";
   }
-  if (p.categoria === "buzo") return p.con_capucha ? "Buzo con capucha" : "Buzo sin capucha";
+  if (p.categoria === "buzo") {
+    // color-block -- ver Patron arriba. Antes que con/sin capucha: es el
+    // dato más específico y reconocible (un color-block real casi siempre
+    // es crewneck, pero el corte importa menos que el color acá).
+    if (p.patron === "bloques") return "Buzo color-block";
+    return p.con_capucha ? "Buzo con capucha" : "Buzo sin capucha";
+  }
   // chomba/polo -- ver Cuello en types.ts (ronda de completitud del
   // catálogo). Antes de esta rama, cualquier remera caía en el genérico
   // "Remera" sin excepción -- una chomba con cuello camisero abrochado es

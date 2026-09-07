@@ -110,6 +110,39 @@ describe("catálogo -- buzo: peso por textura Y por estación (mapeadas una a la
   });
 });
 
+// Pedido explícito del usuario, con foto adjunta de la prenda real: "agrega
+// la prenda de la captura adjunta al catálogo. Es un buzo de entretiempo.
+// Presta atención a la combinación de colores." -- un buzo de 3 franjas
+// horizontales (greige/crema/blanco) que introdujo el patron "bloques" (ver
+// types.ts) y el tercer color (color3_hex) en todo el sistema, ninguno de
+// los cuales existía antes de esta ronda.
+describe("catálogo -- buzo color-block (pedido explícito del usuario, con foto de la prenda real)", () => {
+  const colorblock = CATALOGO_PRENDAS.find((p) => p.id === "buzo-colorblock-greige");
+
+  it("existe y es un buzo con patron bloques", () => {
+    expect(colorblock).toBeDefined();
+    expect(colorblock?.categoria).toBe("buzo");
+    expect(colorblock?.patron).toBe("bloques");
+  });
+
+  it("lleva los 3 colores muestreados de la foto (greige/crema/blanco), no solo 2", () => {
+    expect(colorblock?.colorHex).toBeDefined();
+    expect(colorblock?.colorHex2).toBeDefined();
+    expect(colorblock?.colorHex3).toBeDefined();
+    // Las 3 franjas son tonos de la misma familia (greige->crema->blanco),
+    // a propósito distinto de las camisas a rayas de arriba (que sí
+    // contrastan fondo/raya) -- "presta atención a la combinación de
+    // colores" del usuario era justamente evitar inventar un contraste que
+    // la prenda real no tiene.
+    expect(colorblock?.colorHex).not.toBe(colorblock?.colorHex2);
+    expect(colorblock?.colorHex2).not.toBe(colorblock?.colorHex3);
+  });
+
+  it("es de entretiempo, como pidió el usuario explícitamente", () => {
+    expect(colorblock?.estacion).toBe("entretiempo");
+  });
+});
+
 describe("catálogo -- jean/jogger son urbano sin importar el color", () => {
   // Pedido explícito del usuario, con un caso real: cargó "Jean azul" desde
   // el catálogo y "Vestite hoy" no lo reconocía como Urbano. Causa real: una

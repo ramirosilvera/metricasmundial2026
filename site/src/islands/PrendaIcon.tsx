@@ -296,6 +296,61 @@ export function PatronEstampado({
   );
 }
 
+/** Color-block real de 3 tonos en bandas horizontales -- pedido explícito
+ *  del usuario con foto de referencia real (buzo crewneck de entretiempo:
+ *  banda superior greige, banda media crema, banda inferior blanca, "presta
+ *  atención a la combinación de colores"). Distinto de PatronEstampado de
+ *  arriba a propósito: rayas/cuadros son un ESTAMPADO real (una trama
+ *  repetida chica, impresa o tejida sobre la tela), mientras que un
+ *  color-block es la prenda CORTADA Y COSIDA en paneles de tela de colores
+ *  sólidos distintos -- no hay ninguna repetición que dibujar, son 2-3
+ *  zonas grandes de color plano. Por eso no se resuelve con un <pattern>
+ *  de tile chico (rayas finas de 33% de alto no se leen como paneles
+ *  grandes, se leen como una rayada más) sino con un <linearGradient> de
+ *  paradas duras (dos stops en el mismo offset = borde neto, sin
+ *  degradé) -- mismo mecanismo SVG que ya usa TEXTURA_BRILLO para su
+ *  brillo diagonal, aplicado acá con stopOpacity=1 en vez de blanco
+ *  translúcido. Vertical (x1/y1 a x2/y2, de arriba a abajo) porque un
+ *  color-block real de sweater/buzo divide el CUERPO en bandas
+ *  horizontales (hombro/pecho/ruedo), nunca en paneles verticales
+ *  (izquierda/derecha) -- ese es un diseño distinto (deportivo, con
+ *  paneles laterales, ver PatronPanelDeportivo más abajo) que esta app ya
+ *  cubre aparte. Tercer color opcional -- true casi siempre en la
+ *  prenda real (dos tonos ya se resuelven con color2 solo, sin patrón
+ *  nuevo), pero el caso que motivó esto es tricolor. */
+export function PatronBloques({
+  id,
+  color1,
+  color2,
+  color3,
+}: {
+  id: string;
+  color1: string;
+  color2: string;
+  color3?: string | null;
+}) {
+  if (!color3) {
+    return (
+      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={color1} />
+        <stop offset="50%" stopColor={color1} />
+        <stop offset="50%" stopColor={color2} />
+        <stop offset="100%" stopColor={color2} />
+      </linearGradient>
+    );
+  }
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stopColor={color1} />
+      <stop offset="33%" stopColor={color1} />
+      <stop offset="33%" stopColor={color2} />
+      <stop offset="66%" stopColor={color2} />
+      <stop offset="66%" stopColor={color3} />
+      <stop offset="100%" stopColor={color3} />
+    </linearGradient>
+  );
+}
+
 /** El panel lateral de rayas diagonales de una remera técnica real -- pedido
  *  explícito del usuario con foto de referencia (remera de entrenamiento
  *  tipo gimnasio: panel gris de rayas diagonales sobre el costado negro,
@@ -389,6 +444,7 @@ export function PrendaShape({
   conCapucha = true,
   patron: estampado = "liso",
   color2,
+  color3,
   corteCalzado = "zapatilla_urbana",
   calce,
   cuello,
@@ -445,6 +501,12 @@ export function PrendaShape({
    *  (la raya/el cuadro sobre `color`, que sigue siendo el fondo). Sin
    *  esto, un `patron` distinto de "liso" no dibuja nada: no hay con qué. */
   color2?: string | null;
+  /** Ver Prenda.color3_hex en types.ts -- el tercer color de un color-block
+   *  ("bloques", ver Patron arriba). Solo lo usa "bloques"; el resto de los
+   *  patrones (rayas/cuadros) son de 2 colores y lo ignoran. Opcional
+   *  incluso dentro de "bloques": un color-block de 2 tonos se resuelve
+   *  con color2 solo (ver PatronBloques). */
+  color3?: string | null;
   /** Ver CorteCalzado en types.ts. Solo afecta a "calzado" -- default
    *  "zapatilla_urbana" preserva el ícono de todo el catálogo anterior a
    *  esta columna (100% zapatillas urbanas hasta esta revisión). */
@@ -469,6 +531,7 @@ export function PrendaShape({
   const patId = useId();
   const brilloId = useId();
   const estampadoId = useId();
+  const bloquesId = useId();
   const mallaId = useId();
 
   const conPatron = textura && TEXTURA_PATRON.includes(textura);
@@ -493,6 +556,13 @@ export function PrendaShape({
   // el porqué de por qué es un mecanismo distinto al de textura).
   const conEstampado = (estampado === "rayas" || estampado === "cuadros") && !!color2;
   const estampadoUrl = conEstampado ? `url(#${estampadoId})` : undefined;
+  // color-block ("bloques", ver PatronBloques más arriba) -- mismo
+  // criterio que conEstampado: reemplaza el relleno plano por completo,
+  // no se combina con el patrón semitransparente de textura (una banda de
+  // color sólido no necesita, ni debería, una trama superpuesta encima
+  // que le reste nitidez al corte real).
+  const conBloques = estampado === "bloques" && !!color2;
+  const bloquesUrl = conBloques ? `url(#${bloquesId})` : undefined;
   const tonoPatron = tonoTexturaHsl(tonoH, tonoS, tonoL);
   // panel lateral de rayas diagonales + cinta en la manga -- pedido
   // explícito del usuario con foto de referencia real (remera técnica de
@@ -507,7 +577,7 @@ export function PrendaShape({
   // de algodón común no lleva ninguno de los dos.
   const conPanelDeportivo = esRemeraDeportiva(categoria, textura);
 
-  const defs = (conPatron || conBrillo || conEstampado || conPanelDeportivo) && (
+  const defs = (conPatron || conBrillo || conEstampado || conBloques || conPanelDeportivo) && (
     <defs>
       {conPatron && textura && <PatronTextura id={patId} textura={textura} tono={tonoPatron} />}
       {conBrillo && (
@@ -521,6 +591,7 @@ export function PrendaShape({
       {conEstampado && color2 && (estampado === "rayas" || estampado === "cuadros") && (
         <PatronEstampado id={estampadoId} patron={estampado} colorBase={color} color2={color2} horizontal={categoria === "remera"} />
       )}
+      {conBloques && color2 && <PatronBloques id={bloquesId} color1={color} color2={color2} color3={color3} />}
       {conPanelDeportivo && <PatronPanelDeportivo id={mallaId} tono={tonoDetalle} />}
     </defs>
   );
@@ -678,9 +749,21 @@ export function PrendaShape({
       );
       break;
     case "buzo":
+      // color-block ("bloques", ver PatronBloques más arriba, pedido
+      // explícito del usuario con foto real: buzo crewneck de entretiempo
+      // en 3 bandas horizontales greige/crema/blanco) -- mismo mecanismo
+      // que ya usan remera/camisa para "rayas"/"cuadros": el gradiente
+      // reemplaza el `fill` plano por completo, y se apaga el patrón de
+      // textura semitransparente (bloquesUrl en vez de color, `patron`
+      // pasado como undefined) para no ensuciar el corte de las bandas.
       forma = conCapucha ? (
         <>
-          <FormaConTextura d="M20 10 Q32 2 44 10 L56 18 L49 28 L44 24 L44 58 L20 58 L20 24 L15 28 L8 18 Z" fill={color} stroke={stroke} patron={patron} />
+          <FormaConTextura
+            d="M20 10 Q32 2 44 10 L56 18 L49 28 L44 24 L44 58 L20 58 L20 24 L15 28 L8 18 Z"
+            fill={conBloques ? bloquesUrl! : color}
+            stroke={stroke}
+            patron={conBloques ? undefined : patron}
+          />
           <path d="M26 10 Q32 16 38 10" fill="none" stroke={stroke} />
         </>
       ) : (
@@ -690,7 +773,12 @@ export function PrendaShape({
         // capucha (más curvo que la V recta del sweater: un crewneck cierra
         // en punto, no en V).
         <>
-          <FormaConTextura d="M20 12 Q32 7 44 12 L56 18 L49 28 L44 24 L44 58 L20 58 L20 24 L15 28 L8 18 Z" fill={color} stroke={stroke} patron={patron} />
+          <FormaConTextura
+            d="M20 12 Q32 7 44 12 L56 18 L49 28 L44 24 L44 58 L20 58 L20 24 L15 28 L8 18 Z"
+            fill={conBloques ? bloquesUrl! : color}
+            stroke={stroke}
+            patron={conBloques ? undefined : patron}
+          />
           <path d="M25 10 Q32 15 39 10" fill="none" stroke={stroke} />
         </>
       );
@@ -1139,6 +1227,7 @@ export default function PrendaIcon({
   conCapucha,
   patron,
   color2,
+  color3,
   corteCalzado,
   calce,
   cuello,
@@ -1154,6 +1243,7 @@ export default function PrendaIcon({
   conCapucha?: boolean;
   patron?: Patron;
   color2?: string | null;
+  color3?: string | null;
   corteCalzado?: CorteCalzado;
   calce?: Calce | null;
   cuello?: Cuello | null;
@@ -1172,6 +1262,7 @@ export default function PrendaIcon({
         conCapucha={conCapucha}
         patron={patron}
         color2={color2}
+        color3={color3}
         corteCalzado={corteCalzado}
         calce={calce}
         cuello={cuello}

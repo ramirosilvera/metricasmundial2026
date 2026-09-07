@@ -80,6 +80,7 @@ export default function CatalogoPicker({
             conCapucha={p.conCapucha}
             patron={p.patron}
             color2={p.colorHex2}
+            color3={p.colorHex3}
             corteCalzado={p.corteCalzado}
             calce={p.calce}
             cuello={p.cuello}
