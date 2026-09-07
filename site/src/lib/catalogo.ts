@@ -256,6 +256,17 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // principal, oficina y formal como secundarios), mismo criterio que ya
   // usa sweater-mostaza para declarar que una prenda sirve en más de un
   // registro a propósito, en vez de inferirlo del rango de formalidad.
+  //
+  // Reafirmado en la ronda de separación estricta formal/oficina (pedido
+  // explícito del usuario: "en el catálogo los filtros de formal y de
+  // oficina deben ser distintos"): esa separación se aplicó al PANTALÓN
+  // (ver pantalon-vestir-*/pantalon-gabardina-* más abajo, dos telas
+  // reales y distintas que existen justamente para separar los dos usos),
+  // no a la camisa. Preguntado explícitamente, el usuario confirmó dejar
+  // camisa (y cinturón, ver cinturon-negro más abajo) compartidos: es la
+  // MISMA prenda física en los dos registros -- una camisa blanca de
+  // vestir no es dos camisas distintas según se use con o sin saco, a
+  // diferencia del pantalón, donde sí hay dos prendas de tela distinta.
   { id: "camisa-blanca", nombre: "Camisa blanca", categoria: "camisa", colorHex: "#F5F5F5", textura: "algodon", estilo: "clasico", estilosSecundarios: ["oficina", "formal"], ocasion: "laburo", calce: "ajustado" },
   { id: "camisa-celeste", nombre: "Camisa celeste", categoria: "camisa", colorHex: "#B7D2EC", textura: "algodon", estilo: "clasico", estilosSecundarios: ["oficina", "formal"], ocasion: "laburo", calce: "ajustado" },
   // "urbano" a propósito, no un descuido: una camisa negra lee más
@@ -440,9 +451,15 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // gabardina no es un pantalón de traje -- va perfecto a la oficina con
   // camisa o sweater y aguanta un blazer, pero no es la prenda que define
   // un traje (ver outfitSirveParaEstilo en recommend.ts, que exige saco
-  // para "formal"). Los de lana de arriba conservan "formal" + "oficina"
-  // a propósito: un pantalón de vestir de lana suelto SÍ se usa en la
-  // oficina sin saco, es de uso y costumbre común.
+  // para "formal"). Los de lana de arriba son formal PURO, sin secundario
+  // "oficina" -- corregido en la ronda de separación estricta (pedido
+  // explícito del usuario: "en el catálogo los filtros de formal y de
+  // oficina deben ser distintos"). Quien va a la oficina sin saco usa el
+  // pantalón de gabardina de acá, no el de traje: son dos prendas de tela
+  // distinta que existen justamente para separar esos dos usos, no una
+  // sola prenda que sirve para los dos (a diferencia de una camisa o un
+  // cinturón, que sí son la MISMA prenda física en ambos registros -- ver
+  // el comentario de camisa-blanca más arriba).
   //
   // Marrón -- color nuevo en la categoría (el catálogo no tenía NINGÚN
   // pantalón de vestir marrón hasta ahora, y es uno de los dos que el
@@ -1290,6 +1307,13 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // exactamente el que corresponde con un traje real -- no se toca
   // "urbano" (queda afuera a propósito, mismo criterio que pidió el
   // usuario: un cinturón de vestir no es una pieza de streetwear).
+  //
+  // "formal" + "oficina" juntos siguen a propósito tras la ronda de
+  // separación estricta formal/oficina (mismo criterio que camisa-blanca,
+  // ver ese comentario): el usuario, preguntado explícitamente, confirmó
+  // dejar el cinturón compartido -- es el mismo cinturón de cuero puesto
+  // con o sin saco, no dos cinturones de tela distinta como sí pasa con
+  // el pantalón (lana de traje vs. gabardina de oficina).
   { id: "cinturon-negro", nombre: "Cinturón negro de cuero", categoria: "accesorio", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["casual", "formal", "oficina"] },
   { id: "cinturon-marron", nombre: "Cinturón marrón de cuero", categoria: "accesorio", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["casual", "formal", "oficina"] },
   { id: "corbata-azul-marino", nombre: "Corbata azul marino", categoria: "accesorio", colorHex: "#1F2A44", textura: "seda", estilo: "formal", ocasion: "laburo", requiereCuello: true, posicionAccesorio: "cuello" },
