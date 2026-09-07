@@ -174,10 +174,18 @@ describe("catálogo -- pantalón de vestir: gabardina (oficina) vs. lana de traj
     expect(deGabardina.length).toBeGreaterThan(0);
   });
 
-  it("el de lana es el de TRAJE: formal (con oficina de secundario, se usa suelto sin saco)", () => {
+  // Separación estricta formal/oficina -- pedido explícito del usuario:
+  // "separá el filtro de formal y oficina con el mismo criterio que lo
+  // hicimos en mi placard" (llevó él mismo sus pantalones de lana a
+  // "formal" puro y sus pantalones de oficina a "oficina" puro, sin
+  // secundario cruzado, al cargar su placard real). Antes de esta ronda
+  // el de lana llevaba "oficina" de secundario -- corregido: si la
+  // gabardina existe para ser la tela DE oficina sin ambigüedad, la lana
+  // de traje tiene que ser simétricamente formal puro.
+  it("el de lana es el de TRAJE: formal puro, sin secundario oficina", () => {
     for (const p of deLana) {
       expect(p.estilo).toBe("formal");
-      expect(p.estilosSecundarios ?? []).toContain("oficina");
+      expect(p.estilosSecundarios ?? []).not.toContain("oficina");
     }
   });
 
@@ -392,5 +400,27 @@ describe("catálogo -- gorro/gorra (posicion_accesorio 'cabeza', ver types.ts)",
   it("el gorro de lana lleva estacion invierno; la gorra no está atada a una estación", () => {
     expect(gorros.every((p) => p.estacion === "invierno")).toBe(true);
     expect(gorras.every((p) => !p.estacion)).toBe(true);
+  });
+});
+
+// Pedido explícito del usuario: "sumá al catálogo... campera de gabardina
+// para oficina", en la misma ronda que separó formal/oficina de forma
+// estricta (ver el describe de pantalón de vestir más arriba).
+describe("catálogo -- campera de gabardina (oficina)", () => {
+  const camperasGabardina = CATALOGO_PRENDAS.filter((p) => p.categoria === "campera" && p.textura === "gabardina");
+
+  it("existe al menos una campera de gabardina", () => {
+    expect(camperasGabardina.length).toBeGreaterThan(0);
+  });
+
+  it("es de oficina, nunca formal -- un sobretodo de gabardina no es una prenda de traje", () => {
+    for (const p of camperasGabardina) {
+      expect(p.estilo).toBe("oficina");
+      expect([p.estilo, ...(p.estilosSecundarios ?? [])]).not.toContain("formal");
+    }
+  });
+
+  it("es de entretiempo, la contraparte liviana del tapado de paño (lana/invierno)", () => {
+    expect(camperasGabardina.every((p) => p.estacion === "entretiempo")).toBe(true);
   });
 });

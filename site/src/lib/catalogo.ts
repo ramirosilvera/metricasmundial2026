@@ -390,14 +390,23 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // auditoría del motor): un pantalón de vestir real es de corte recto/
   // entallado, no ancho, la contraparte de volumen contenido que hace que
   // un saco/blazer (también "ajustado" más abajo) funcione en proporción.
-  // estilosSecundarios: ["oficina"] en los 4 -- pedido explícito del
-  // usuario: "formal y oficina se mezclan... formal es el traje (con
-  // saco), oficina es elegante sport (pantalón de vestir + camisa/sweater,
-  // sin saco ni corbata)". El pantalón de vestir en sí sirve para las dos
-  // ocasiones (es la base compartida, lo que cambia es si arriba va un
-  // saco o no) -- ver el chequeo nuevo en outfitSirveParaEstilo
-  // (recommend.ts), que exige saco para "formal" y lo prohíbe para
-  // "oficina".
+  // SIN estilosSecundarios "oficina" en los 3 -- corregido en la ronda de
+  // separación estricta formal/oficina (pedido explícito del usuario:
+  // "separá el filtro de formal y oficina con el mismo criterio que lo
+  // hicimos en mi placard"). La ronda anterior (gabardina) los dejaba con
+  // secundario "oficina" bajo el argumento de que "el pantalón de vestir
+  // en sí sirve para las dos ocasiones" -- pero el usuario, al cargar su
+  // propio placard real, hizo lo contrario con sus propias prendas: separó
+  // sus pantalones de lana (ahora "formal" puro, sin secundario) de sus
+  // pantalones de oficina (gabardina/pana, "oficina" puro, sin "formal").
+  // Es la separación real y correcta de sastrería que ya motivó toda la
+  // distinción gabardina/lana de la ronda anterior, llevada hasta el
+  // final: si la gabardina existe justamente para ser la tela de oficina
+  // (sin ambigüedad con el traje), la lana de traje tiene que ser
+  // simétricamente formal PURO -- dejarle el secundario "oficina" era la
+  // mitad de la separación, no la separación completa. Quien va de
+  // oficina sin saco usa el pantalón de gabardina (acá abajo), no el de
+  // traje.
   // textura "lana" en los 3 -- son los pantalones de TRAJE: lana tropical/
   // fresco, la tela que se corta junto con el saco. Los tres colores que
   // quedan acá son exactamente los tres colores de traje reales (negro,
@@ -405,9 +414,9 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // gabardina de acá abajo, porque un pantalón de traje beige de lana no
   // es un básico real -- el pantalón beige de vestir que existe de verdad
   // es de gabardina (o un chino, que ya está más abajo).
-  { id: "pantalon-vestir-negro", nombre: "Pantalón de vestir negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
-  { id: "pantalon-vestir-gris", nombre: "Pantalón de vestir gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
-  { id: "pantalon-vestir-azul", nombre: "Pantalón de vestir azul marino", categoria: "pantalon", colorHex: "#1F2A44", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-vestir-negro", nombre: "Pantalón de vestir negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "lana", estilo: "formal", ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-vestir-gris", nombre: "Pantalón de vestir gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "lana", estilo: "formal", ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-vestir-azul", nombre: "Pantalón de vestir azul marino", categoria: "pantalon", colorHex: "#1F2A44", textura: "lana", estilo: "formal", ocasion: "laburo", calce: "ajustado" },
 
   // --- Pantalón de gabardina (el de OFICINA) -- pedido explícito del
   // usuario, revisado como sastre e ingeniero textil: "los pantalones de
@@ -1174,6 +1183,37 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // tapado es lana tejida apretada, la aproximación más cercana que tiene
   // el enum sin inventar una textura "paño" que no existe.
   { id: "tapado-pano-gris", nombre: "Tapado de paño gris", categoria: "campera", colorHex: "#4A4A4A", textura: "lana", estilo: "clasico", ocasion: "laburo", estacion: "invierno" },
+
+  // --- Campera de gabardina (oficina) -- pedido explícito del usuario:
+  // "sumá al catálogo... campera de gabardina para oficina", en la misma
+  // ronda que llevó la separación formal/oficina hasta el final (ver el
+  // comentario largo en pantalon-vestir-* de más arriba). Mismo criterio
+  // textil que ese pantalón y que pantalon-gabardina-* de más arriba: la
+  // gabardina es justamente la tela real de un sobretodo/trench de
+  // oficina -- sarga cerrada, mate y firme, resistente al uso diario y algo
+  // al agua por lo apretado del tejido (el "trench coat" clásico es
+  // literalmente esta tela) -- tan de oficina como el pantalón homónimo.
+  //
+  // Reusa la silueta genérica de campera a propósito, sin pieza nueva:
+  // esta app no modela el LARGO de un abrigo (un trench real llega a la
+  // rodilla, más largo que una campera de calle), mismo criterio ya
+  // establecido por tapado-pano-gris de acá arriba (paño/lana, invierno) --
+  // es la fibra la que cambia la lectura, no un dibujo aparte por prenda.
+  //
+  // estilo "oficina" + secundario "clasico", igual que pantalon-gabardina-*
+  // -- NUNCA "formal": un sobretodo de gabardina no es una prenda de traje
+  // (no se corta junto con el saco), se usa arriba de un pantalón de
+  // gabardina o de un chino, no de un traje completo. Entretiempo, no
+  // invierno: la gabardina es una tela más liviana y de tejido más
+  // cerrado que el paño de tapado-pano-gris, la contraparte de estación
+  // intermedia de ese mismo rol (sobretodo de oficina), no un duplicado.
+  //
+  // Beige -- el color de gabardina/trench MÁS citado en cualquier
+  // guardarropa real (el trench coat clásico es directamente este color),
+  // mismo hex que ya usa el resto del catálogo (pantalon-gabardina-beige y
+  // compañía). Negro -- el otro sobretodo de oficina real, más neutro.
+  { id: "campera-gabardina-beige", nombre: "Campera de gabardina beige", categoria: "campera", colorHex: "#D8C7A1", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
+  { id: "campera-gabardina-negra", nombre: "Campera de gabardina negra", categoria: "campera", colorHex: "#1A1A1A", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
 
   // --- Sacos ---
   // Categoría nueva -- pedido explícito del usuario ("quiero que agregues
