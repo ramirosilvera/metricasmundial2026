@@ -122,8 +122,14 @@ export default function Probar() {
           color2_h: null,
           color2_s: null,
           color2_l: null,
+          color3_hex: null,
+          color3_h: null,
+          color3_s: null,
+          color3_l: null,
           corte_calzado: "zapatilla_urbana",
           calce: "regular",
+          cuello: null,
+          manga: null,
           necesita_cambio: false,
           created_at: "",
           updated_at: "",
@@ -204,8 +210,11 @@ export default function Probar() {
                 conCapucha={pruebaBase.con_capucha}
                 patron={pruebaBase.patron}
                 color2={pruebaBase.color2_hex}
+                color3={pruebaBase.color3_hex}
                 corteCalzado={pruebaBase.corte_calzado}
                 calce={pruebaBase.calce}
+                cuello={pruebaBase.cuello}
+                manga={pruebaBase.manga}
               />
             </span>
             <div style={{ flex: 1 }}>
@@ -253,8 +262,11 @@ export default function Probar() {
                             conCapucha={prenda.con_capucha}
                             patron={prenda.patron}
                             color2={prenda.color2_hex}
+                            color3={prenda.color3_hex}
                             corteCalzado={prenda.corte_calzado}
                             calce={prenda.calce}
+                            cuello={prenda.cuello}
+                            manga={prenda.manga}
                           />
                         </span>
                         <div style={{ flex: 1 }}>

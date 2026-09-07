@@ -255,8 +255,11 @@ export function Contenido({
                           conCapucha={p.con_capucha}
                           patron={p.patron}
                           color2={p.color2_hex}
+                          color3={p.color3_hex}
                           corteCalzado={p.corte_calzado}
                           calce={p.calce}
+                          cuello={p.cuello}
+                          manga={p.manga}
                         />
                       </span>
                       <strong style={{ fontSize: "0.85rem" }}>{descripcionPrenda(p)}</strong>

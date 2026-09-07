@@ -1,4 +1,4 @@
-import type { Calce, Categoria, CorteCalzado, Estacion, Estilo, Ocasion, Patron, Prenda, Textura } from "./types";
+import type { Calce, Categoria, CorteCalzado, Cuello, Estacion, Estilo, Manga, Ocasion, Patron, Prenda, Textura } from "./types";
 import { hexToHsl } from "./color";
 
 export interface PresetPrenda {
@@ -21,7 +21,7 @@ export interface PresetPrenda {
   requiereCuello?: boolean;
   /** Ver Prenda.posicion_accesorio en types.ts. Solo tiene sentido en
    *  categoria="accesorio"; se omite (== "cintura", cinturón) en el resto. */
-  posicionAccesorio?: "cuello" | "cintura";
+  posicionAccesorio?: "cuello" | "cintura" | "cabeza";
   /** Ver Prenda.con_capucha en types.ts. Solo tiene sentido en
    *  categoria="buzo"; se omite (== true, hoodie) salvo en los crewneck
    *  puntuales sin capucha. */
@@ -33,6 +33,10 @@ export interface PresetPrenda {
    *  obligatorio en la práctica cuando `patron` no es "liso", si no no hay
    *  con qué dibujar el estampado real. */
   colorHex2?: string;
+  /** Tercer color, solo lo usa patron="bloques" (ver Prenda.color3_* en
+   *  types.ts) -- opcional incluso ahí, un color-block de 2 tonos se
+   *  resuelve con colorHex2 solo. */
+  colorHex3?: string;
   /** Ver CorteCalzado en types.ts. Solo tiene sentido en categoria="calzado";
    *  se omite (== "zapatilla_urbana") en el resto de las categorías. */
   corteCalzado?: CorteCalzado;
@@ -41,6 +45,14 @@ export interface PresetPrenda {
    *  claramente distinto de un corte estándar (jogger/short deportivo
    *  holgados, camisa de vestir/blazer ajustados). */
   calce?: Calce;
+  /** Ver Cuello en types.ts. Solo tiene sentido en categoria="remera"
+   *  ("polo", la chomba) y categoria="sweater" ("alto", el cuello alto) --
+   *  se omite (fallback por categoría, ver types.ts) en el resto. */
+  cuello?: Cuello;
+  /** Ver Manga en types.ts. Solo tiene sentido en categoria="camisa"
+   *  ("corta") y categoria="sweater" ("sin_mangas", el chaleco) -- se
+   *  omite (== "larga") en el resto. */
+  manga?: Manga;
 }
 
 /**
@@ -198,6 +210,32 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   { id: "remera-deportiva-negra", nombre: "Remera deportiva negra", categoria: "remera", colorHex: "#1A1A1A", textura: "poliester", estilo: "deportivo", ocasion: "casual" },
   { id: "remera-deportiva-gris", nombre: "Remera deportiva gris", categoria: "remera", colorHex: "#8C8C8C", textura: "poliester", estilo: "deportivo", ocasion: "casual" },
 
+  // --- Chomba/polo -- ronda de completitud del catálogo (pedido explícito
+  // del usuario: "revisá todas las prendas del catálogo, decime si está
+  // completo o se puede completar aún más"), revisada como modista y
+  // asesor de imagen. Hueco real: la chomba es EL básico smart-casual de
+  // verano por excelencia (tan citado en usos y costumbres como el chino o
+  // la camisa blanca) y el catálogo no tenía ninguna -- toda remera hasta
+  // esta ronda era, a los ojos del motor de dibujo, cuello redondo liso.
+  //
+  // categoria "remera" (no una categoría nueva): comparte estructura real
+  // con la remera (manga corta, se usa sola o bajo una campera, mismo
+  // rango de calce) -- lo único que cambia es el cuello (ver Cuello en
+  // types.ts), y ya existe el campo para eso. Estilo "clasico" con
+  // secundario "casual": una chomba lisa es el básico de fin de semana
+  // "vestido pero relajado" -- más formal que una remera lisa (por el
+  // cuello abrochado), menos que una camisa, el registro real que ocupa
+  // el hueco entre las dos. Blanca y azul marino -- los dos colores de
+  // chomba más citados en cualquier guía de vestuario básico masculino,
+  // mismos hex que ya usa el resto del catálogo.
+  { id: "chomba-blanca", nombre: "Chomba blanca", categoria: "remera", colorHex: "#F5F5F5", textura: "algodon", estilo: "clasico", estilosSecundarios: ["casual"], ocasion: "casual", cuello: "polo" },
+  { id: "chomba-azul-marino", nombre: "Chomba azul marino", categoria: "remera", colorHex: "#1F2A44", textura: "algodon", estilo: "clasico", estilosSecundarios: ["casual"], ocasion: "casual", cuello: "polo" },
+  // gris -- el tercer color de chomba más versátil (combina con cualquier
+  // pantalón, ver esNeutro en recommend.ts), completa el kit sin
+  // duplicar los dos colores "de vestuario" de arriba con uno puramente
+  // neutro.
+  { id: "chomba-gris", nombre: "Chomba gris", categoria: "remera", colorHex: "#8C8C8C", textura: "algodon", estilo: "clasico", estilosSecundarios: ["casual"], ocasion: "casual", cuello: "polo" },
+
   // --- Camisas (oficina) ---
   // #F5F5F5 -- ver el comentario de remera-blanca más arriba. #FAFAF7
   // (s=23) también clasificaba como "Blanco roto" en vez de "Blanco".
@@ -222,6 +260,17 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // principal, oficina y formal como secundarios), mismo criterio que ya
   // usa sweater-mostaza para declarar que una prenda sirve en más de un
   // registro a propósito, en vez de inferirlo del rango de formalidad.
+  //
+  // Reafirmado en la ronda de separación estricta formal/oficina (pedido
+  // explícito del usuario: "en el catálogo los filtros de formal y de
+  // oficina deben ser distintos"): esa separación se aplicó al PANTALÓN
+  // (ver pantalon-vestir-*/pantalon-gabardina-* más abajo, dos telas
+  // reales y distintas que existen justamente para separar los dos usos),
+  // no a la camisa. Preguntado explícitamente, el usuario confirmó dejar
+  // camisa (y cinturón, ver cinturon-negro más abajo) compartidos: es la
+  // MISMA prenda física en los dos registros -- una camisa blanca de
+  // vestir no es dos camisas distintas según se use con o sin saco, a
+  // diferencia del pantalón, donde sí hay dos prendas de tela distinta.
   { id: "camisa-blanca", nombre: "Camisa blanca", categoria: "camisa", colorHex: "#F5F5F5", textura: "algodon", estilo: "clasico", estilosSecundarios: ["oficina", "formal"], ocasion: "laburo", calce: "ajustado" },
   { id: "camisa-celeste", nombre: "Camisa celeste", categoria: "camisa", colorHex: "#B7D2EC", textura: "algodon", estilo: "clasico", estilosSecundarios: ["oficina", "formal"], ocasion: "laburo", calce: "ajustado" },
   // "urbano" a propósito, no un descuido: una camisa negra lee más
@@ -312,6 +361,18 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // contraste del color, no de la fibra.
   { id: "camisa-rayas-negra", nombre: "Camisa a rayas negras", categoria: "camisa", colorHex: "#F5F5F5", colorHex2: "#1A1A1A", patron: "rayas", textura: "algodon", estilo: "urbano", ocasion: "casual" },
 
+  // --- Camisa de manga corta (oficina de verano) -- ronda de completitud
+  // del catálogo (ver Manga en types.ts). Hueco real: hasta esta ronda
+  // toda camisa del catálogo era, a los ojos del motor, de manga larga --
+  // sin forma de cargar la camisa de verano/oficina de manga corta, un
+  // básico tan real como el pantalón de lino de acá abajo (misma estación,
+  // mismo motivo: la lana/gabardina de invierno tiene su contraparte
+  // liviana, la manga larga de oficina también). Celeste y blanca -- los
+  // mismos dos colores de oficina más citados del resto del catálogo,
+  // mismos hex que camisa-celeste/camisa-blanca.
+  { id: "camisa-manga-corta-celeste", nombre: "Camisa celeste manga corta", categoria: "camisa", colorHex: "#B7D2EC", textura: "algodon", estilo: "clasico", estilosSecundarios: ["oficina"], ocasion: "laburo", manga: "corta" },
+  { id: "camisa-manga-corta-blanca", nombre: "Camisa blanca manga corta", categoria: "camisa", colorHex: "#F5F5F5", textura: "algodon", estilo: "clasico", estilosSecundarios: ["oficina"], ocasion: "laburo", manga: "corta" },
+
   // --- Camisa de jean (overshirt) -- ampliación del catálogo. Distinta de
   // campera-jean de más abajo (esa es una campera, cierra como campera, se
   // usa como capa exterior sobre una remera) y de jean-azul (pantalón): una
@@ -344,23 +405,80 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // auditoría del motor): un pantalón de vestir real es de corte recto/
   // entallado, no ancho, la contraparte de volumen contenido que hace que
   // un saco/blazer (también "ajustado" más abajo) funcione en proporción.
-  // estilosSecundarios: ["oficina"] en los 4 -- pedido explícito del
-  // usuario: "formal y oficina se mezclan... formal es el traje (con
-  // saco), oficina es elegante sport (pantalón de vestir + camisa/sweater,
-  // sin saco ni corbata)". El pantalón de vestir en sí sirve para las dos
-  // ocasiones (es la base compartida, lo que cambia es si arriba va un
-  // saco o no) -- ver el chequeo nuevo en outfitSirveParaEstilo
-  // (recommend.ts), que exige saco para "formal" y lo prohíbe para
-  // "oficina".
-  { id: "pantalon-vestir-negro", nombre: "Pantalón de vestir negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
-  { id: "pantalon-vestir-gris", nombre: "Pantalón de vestir gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
-  { id: "pantalon-vestir-azul", nombre: "Pantalón de vestir azul marino", categoria: "pantalon", colorHex: "#1F2A44", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
-  // distinto de pantalon-beige de acá abajo (el chino, algodón/clasico) --
-  // mismo beige del resto del catálogo, pero de vestir: lana/formal, igual
-  // criterio que negro/gris/azul marino de arriba. No es una entrada
-  // duplicada -- un chino y un pantalón de vestir son prendas distintas
-  // aunque compartan color.
-  { id: "pantalon-vestir-beige", nombre: "Pantalón de vestir beige", categoria: "pantalon", colorHex: "#D8C7A1", textura: "lana", estilo: "formal", estilosSecundarios: ["oficina"], ocasion: "laburo", calce: "ajustado" },
+  // SIN estilosSecundarios "oficina" en los 3 -- corregido en la ronda de
+  // separación estricta formal/oficina (pedido explícito del usuario:
+  // "separá el filtro de formal y oficina con el mismo criterio que lo
+  // hicimos en mi placard"). La ronda anterior (gabardina) los dejaba con
+  // secundario "oficina" bajo el argumento de que "el pantalón de vestir
+  // en sí sirve para las dos ocasiones" -- pero el usuario, al cargar su
+  // propio placard real, hizo lo contrario con sus propias prendas: separó
+  // sus pantalones de lana (ahora "formal" puro, sin secundario) de sus
+  // pantalones de oficina (gabardina/pana, "oficina" puro, sin "formal").
+  // Es la separación real y correcta de sastrería que ya motivó toda la
+  // distinción gabardina/lana de la ronda anterior, llevada hasta el
+  // final: si la gabardina existe justamente para ser la tela de oficina
+  // (sin ambigüedad con el traje), la lana de traje tiene que ser
+  // simétricamente formal PURO -- dejarle el secundario "oficina" era la
+  // mitad de la separación, no la separación completa. Quien va de
+  // oficina sin saco usa el pantalón de gabardina (acá abajo), no el de
+  // traje.
+  // textura "lana" en los 3 -- son los pantalones de TRAJE: lana tropical/
+  // fresco, la tela que se corta junto con el saco. Los tres colores que
+  // quedan acá son exactamente los tres colores de traje reales (negro,
+  // gris y azul marino); el beige salió de este grupo en la ronda de
+  // gabardina de acá abajo, porque un pantalón de traje beige de lana no
+  // es un básico real -- el pantalón beige de vestir que existe de verdad
+  // es de gabardina (o un chino, que ya está más abajo).
+  { id: "pantalon-vestir-negro", nombre: "Pantalón de vestir negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "lana", estilo: "formal", ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-vestir-gris", nombre: "Pantalón de vestir gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "lana", estilo: "formal", ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-vestir-azul", nombre: "Pantalón de vestir azul marino", categoria: "pantalon", colorHex: "#1F2A44", textura: "lana", estilo: "formal", ocasion: "laburo", calce: "ajustado" },
+
+  // --- Pantalón de gabardina (el de OFICINA) -- pedido explícito del
+  // usuario, revisado como sastre e ingeniero textil: "los pantalones de
+  // vestir que tengo, negro y marrón, que son de oficina y clásicos, son
+  // de gabardina... en el catálogo podés distinguir los de oficina, que
+  // son típicamente de gabardina, y los formales, que son otra tela más
+  // suave tipo de traje". Tenía razón y era un hueco real: hasta esta
+  // ronda TODO pantalón de vestir del catálogo era "lana", así que la
+  // prenda que más se usa para ir a trabajar no existía como tal.
+  //
+  // Por qué son entradas propias y no un color más de los de arriba: es
+  // otra tela de verdad (sarga empinada ~63°, trama cerrada, mate y firme
+  // contra la caída suave y difusa de la lana de traje -- ver el enum
+  // Textura en types.ts), otro registro real (el de traje se corta con el
+  // saco; el de gabardina se usa solo, con camisa o sweater) y hasta se
+  // dibujan distinto (misma raya planchada, otra trama -- ver
+  // esPantalonDeVestir y PatronTextura en PrendaIcon.tsx). Mismo criterio
+  // que ya separó el chino de algodón del pantalón de vestir de lana.
+  //
+  // estilo "oficina" + secundario "clasico", NO "formal": un pantalón de
+  // gabardina no es un pantalón de traje -- va perfecto a la oficina con
+  // camisa o sweater y aguanta un blazer, pero no es la prenda que define
+  // un traje (ver outfitSirveParaEstilo en recommend.ts, que exige saco
+  // para "formal"). Los de lana de arriba son formal PURO, sin secundario
+  // "oficina" -- corregido en la ronda de separación estricta (pedido
+  // explícito del usuario: "en el catálogo los filtros de formal y de
+  // oficina deben ser distintos"). Quien va a la oficina sin saco usa el
+  // pantalón de gabardina de acá, no el de traje: son dos prendas de tela
+  // distinta que existen justamente para separar esos dos usos, no una
+  // sola prenda que sirve para los dos (a diferencia de una camisa o un
+  // cinturón, que sí son la MISMA prenda física en ambos registros -- ver
+  // el comentario de camisa-blanca más arriba).
+  //
+  // Marrón -- color nuevo en la categoría (el catálogo no tenía NINGÚN
+  // pantalón de vestir marrón hasta ahora, y es uno de los dos que el
+  // usuario tiene en el placard). Reusa el mismo marrón café del resto del
+  // catálogo (#6F4E37, ya en zapatillas-marrones y pantalon-pana-marron)
+  // por la misma consistencia de paleta que documenta el resto del archivo.
+  { id: "pantalon-gabardina-negro", nombre: "Pantalón de gabardina negro", categoria: "pantalon", colorHex: "#1A1A1A", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-gabardina-marron", nombre: "Pantalón de gabardina marrón", categoria: "pantalon", colorHex: "#6F4E37", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
+  { id: "pantalon-gabardina-gris", nombre: "Pantalón de gabardina gris", categoria: "pantalon", colorHex: "#6E6E6E", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
+  // el que antes era "pantalon-vestir-beige" (lana/formal) -- ver el
+  // comentario de los de lana de arriba: el pantalón de vestir beige real
+  // es de gabardina, no de lana de traje. Sigue siendo distinto de
+  // pantalon-beige de acá abajo (el chino, algodón/clasico): mismo beige
+  // del resto del catálogo, otra tela y otro registro.
+  { id: "pantalon-gabardina-beige", nombre: "Pantalón de gabardina beige", categoria: "pantalon", colorHex: "#D8C7A1", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", calce: "ajustado" },
   { id: "pantalon-beige", nombre: "Pantalón chino beige", categoria: "pantalon", colorHex: "#D8C7A1", textura: "algodon", estilo: "clasico", ocasion: "laburo" },
 
   // --- Pantalón de lino (clásico, verano) -- ampliación del catálogo,
@@ -499,6 +617,56 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // crewneck de cada peso.
   { id: "buzo-crewneck-gris", nombre: "Buzo crewneck gris (sin capucha)", categoria: "buzo", colorHex: "#8C8C8C", textura: "frisado", estilo: "casual", ocasion: "casual", conCapucha: false, estacion: "invierno" },
   { id: "buzo-crewneck-azul-marino", nombre: "Buzo crewneck azul marino (sin capucha)", categoria: "buzo", colorHex: "#1F2A44", textura: "tejido_grueso", estilo: "casual", ocasion: "casual", conCapucha: false, estacion: "entretiempo" },
+
+  // --- Buzo color-block -- pedido explícito del usuario con foto real
+  // (revisado como sastre, ingeniero textil, asesor de imagen/moda,
+  // modista): "es un buzo de entretiempo. Presta atención a la
+  // combinación de colores". Hueco real de tipo de decoración, no solo de
+  // color: hasta esta ronda el catálogo tenía estampados repetidos
+  // (rayas/cuadros, ver Patron en types.ts) pero ningún color-block --
+  // una prenda cortada y cosida en paneles de tela de colores sólidos
+  // GRANDES, sin ninguna repetición, un archetype real y distinto (no una
+  // variante de rayas con la raya más ancha). Ver PatronBloques en
+  // PrendaIcon.tsx para el porqué necesitaba su propio mecanismo de
+  // dibujo.
+  //
+  // 3 colores, muestreados de la foto real (no inventados): banda
+  // superior greige #B6AB99 (un beige-gris apagado, más frío y menos
+  // saturado que el "Beige" #D8C7A1 que ya usa el resto del catálogo --
+  // son dos beige reales distintos, no el mismo tono repetido), banda
+  // media crema #E4DDCC (un paso más claro, mismo matiz cálido que el
+  // greige pero mucho menos croma), banda inferior blanco roto #F5F5F0
+  // (reusa el mismo hex que ya usan las zapatillas de lona blancas --
+  // consistencia de paleta, es el mismo "casi blanco" de siempre). Los
+  // tres tonos son parientes cercanos dentro de la misma familia neutra
+  // (greige -> crema -> blanco, un degradé tonal, no un contraste de
+  // colores distintos) -- un color-block real de este tipo se apoya en
+  // gradación de VALOR (claro/oscuro), no en matices que compitan entre
+  // sí, y es justamente lo que hace que las tres bandas de la prenda real
+  // combinen entre sí sin choque, algo que un asesor de color reconoce a
+  // primera vista.
+  //
+  // con_capucha: false -- crew neck real en la foto, sin capucha.
+  // Textura/estación/estilo/ocasión: mismo patrón que buzo-crewneck-azul-
+  // marino (el sibling más cercano, mismo corte crewneck+entretiempo) --
+  // tejido_grueso es la textura real de un French terry/fleece de
+  // entretiempo (no frisado, que es el peso de invierno), casual/casual
+  // es el registro real de un crewneck de calle.
+  {
+    id: "buzo-colorblock-greige",
+    nombre: "Buzo color-block greige",
+    categoria: "buzo",
+    colorHex: "#B6AB99",
+    colorHex2: "#E4DDCC",
+    colorHex3: "#F5F5F0",
+    patron: "bloques",
+    textura: "tejido_grueso",
+    estilo: "casual",
+    ocasion: "casual",
+    conCapucha: false,
+    estacion: "entretiempo",
+  },
+
   // buzo oversize -- auditoría de sastrería (Consejo, ronda de revisión
   // visual del maniquí), pedido explícito del usuario ("revisa en el
   // maniquí cómo quedan las prendas ajustada, regular u holgada... si no
@@ -589,7 +757,10 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // tan citado en moda como el sweater a rayas o la camisa blanca), no una
   // variante menor. Lana + invierno, mismo criterio textil que el resto de
   // los sweaters de lana de arriba. Mismo negro estándar del catálogo.
-  { id: "sweater-cuello-alto-negro", nombre: "Sweater cuello alto negro", categoria: "sweater", colorHex: "#1A1A1A", textura: "lana", estilo: "clasico", estilosSecundarios: ["oficina"], ocasion: "laburo", estacion: "invierno" },
+  // cuello: "alto" -- ronda de completitud del catálogo (ver Cuello en
+  // types.ts): esta prenda ya existía con este nombre, pero hasta agregar
+  // el campo se dibujaba exactamente igual que cualquier sweater cuello V.
+  { id: "sweater-cuello-alto-negro", nombre: "Sweater cuello alto negro", categoria: "sweater", colorHex: "#1A1A1A", textura: "lana", estilo: "clasico", estilosSecundarios: ["oficina"], ocasion: "laburo", estacion: "invierno", cuello: "alto" },
 
   // --- Sweater de algodón (entretiempo, cuello en V) -- ampliación del
   // catálogo, pedido explícito del usuario: "sweater de algodón de
@@ -617,6 +788,21 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   { id: "sweater-algodon-negro", nombre: "Sweater de algodón negro", categoria: "sweater", colorHex: "#1A1A1A", textura: "algodon", estilo: "clasico", estilosSecundarios: ["casual", "oficina"], ocasion: "laburo", estacion: "entretiempo" },
   { id: "sweater-algodon-marron", nombre: "Sweater de algodón marrón", categoria: "sweater", colorHex: "#6F4E37", textura: "algodon", estilo: "clasico", estilosSecundarios: ["casual", "oficina"], ocasion: "laburo", estacion: "entretiempo" },
   { id: "sweater-algodon-gris", nombre: "Sweater de algodón gris", categoria: "sweater", colorHex: "#8C8C8C", textura: "algodon", estilo: "clasico", estilosSecundarios: ["casual", "oficina"], ocasion: "laburo", estacion: "entretiempo" },
+
+  // --- Chaleco (sweater sin mangas) -- ronda de completitud del catálogo
+  // (ver Manga en types.ts), revisada como sastre y modista. Hueco real y
+  // prenda de sastrería con identidad propia, no una variante menor de
+  // "sweater con mangas cortas" (eso no existe como prenda real): el
+  // chaleco se usa solo sobre una camisa (el reemplazo liviano del saco
+  // para un look de oficina sin sastrería completa) o bajo un saco en
+  // invierno, capa que ni el sweater de mangas largas ni la camisa sola
+  // cubrían. Lana + invierno, mismo criterio textil que el resto de los
+  // sweaters de lana de arriba -- un chaleco real de oficina es de la
+  // misma fibra que un sweater de invierno, la mangas es lo único que
+  // cambia. Gris y azul marino -- los mismos dos colores de sweater de
+  // oficina más versátiles del resto del catálogo.
+  { id: "chaleco-gris", nombre: "Chaleco gris", categoria: "sweater", colorHex: "#8C8C8C", textura: "lana", estilo: "clasico", estilosSecundarios: ["oficina"], ocasion: "laburo", estacion: "invierno", manga: "sin_mangas" },
+  { id: "chaleco-azul-marino", nombre: "Chaleco azul marino", categoria: "sweater", colorHex: "#1F2A44", textura: "lana", estilo: "clasico", estilosSecundarios: ["oficina"], ocasion: "laburo", estacion: "invierno", manga: "sin_mangas" },
 
   // --- Calzado ---
   // Revisado como modista/ingeniero textil, pedido explícito del usuario:
@@ -818,6 +1004,65 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     ocasion: "casual",
     corteCalzado: "mocasin",
   },
+  // --- Botines de cuero -- ronda de completitud del catálogo (pedido
+  // explícito del usuario: "revisá todas las prendas del catálogo, quiero
+  // que me digas si está completo o se puede completar aún más"), revisado
+  // como modista y asesor de imagen. Era el hueco MÁS GRANDE que tenía el
+  // catálogo: los cinco cortes de calzado que existían (zapatilla urbana,
+  // running, zapato de vestir, mocasín, zapatilla de lona) son todos
+  // calzado BAJO, así que un placard armado con este catálogo no tenía con
+  // qué vestirse los pies en invierno -- en una app que separa invierno,
+  // entretiempo y verano en todas las demás categorías de abrigo.
+  //
+  // Marrón primero: el botín de cuero marrón es el más versátil de los dos
+  // en un guardarropa real (va con jean, chino, pana y pantalón de
+  // gabardina), y encima el catálogo ya tiene toda la familia de marrones
+  // que lo acompañan (cinturón, mocasines, pana). Mismos hex que ya usan
+  // mocasines-marrones (#5C3A21) y zapatillas-marrones (#6F4E37) --
+  // consistencia de paleta, y dos marrones reales distintos de botín (uno
+  // oscuro tipo borcego, uno más claro tipo chukka/camel).
+  //
+  // Sin `estacion`, igual que el resto del calzado: un botín se usa de
+  // otoño a primavera, no solo con frío extremo -- tagearlo "invierno" lo
+  // sacaría de todos los outfits de entretiempo, que es justo cuando más
+  // se usa.
+  {
+    id: "botines-cuero-marron",
+    nombre: "Botines de cuero marrones",
+    categoria: "calzado",
+    colorHex: "#5C3A21",
+    textura: "cuero_liso",
+    estilo: "clasico",
+    estilosSecundarios: ["casual", "urbano"],
+    ocasion: "casual",
+    corteCalzado: "botin",
+  },
+  {
+    id: "botines-cuero-camel",
+    nombre: "Botines de cuero camel",
+    categoria: "calzado",
+    colorHex: "#6F4E37",
+    textura: "cuero_liso",
+    estilo: "clasico",
+    estilosSecundarios: ["casual", "urbano"],
+    ocasion: "casual",
+    corteCalzado: "botin",
+  },
+  // negro -- el otro botín real del guardarropa: más urbano que clásico
+  // (con jean negro y campera de cuero es el look de calle por excelencia),
+  // por eso estilo "urbano" con "clasico" de secundario, al revés que los
+  // marrones de acá arriba.
+  {
+    id: "botines-cuero-negros",
+    nombre: "Botines de cuero negros",
+    categoria: "calzado",
+    colorHex: "#1C1210",
+    textura: "cuero_liso",
+    estilo: "urbano",
+    estilosSecundarios: ["clasico", "casual"],
+    ocasion: "casual",
+    corteCalzado: "botin",
+  },
   // zapatillas de lona -- registro casual, el otro hueco real del catálogo.
   // Los 3 colores clásicos de una zapatilla de lona real (blanco/negro/
   // azul marino), sin textura "cuero_liso" (es lona/textil, no cuero) --
@@ -859,6 +1104,20 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     ocasion: "casual",
     corteCalzado: "zapatilla_lona",
   },
+
+  // --- Sandalias de cuero -- ronda de completitud del catálogo (ver
+  // CorteCalzado en types.ts), revisada como modista y asesor de imagen:
+  // la contraparte de verano del botín de acá arriba. Los cinco cortes
+  // anteriores a esta ronda cubrían frío/entretiempo (botín) o calzado
+  // cerrado de calle todo el año, pero ninguno era realmente de verano --
+  // un guardarropa real no usa zapatilla cerrada con bermuda en pleno
+  // enero. Cuero (no lona/goma): la sandalia de cuero tipo "sandalia
+  // franciscana"/de tiras es el registro clásico/casual real, la
+  // contraparte de verano del mocasín (mismo estilo, misma tela) más que
+  // de la zapatilla urbana. Marrón y negro -- mismos hex que ya usan
+  // mocasines-marrones/mocasines-negros, consistencia de paleta.
+  { id: "sandalias-cuero-marron", nombre: "Sandalias de cuero marrones", categoria: "calzado", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["casual"], ocasion: "casual", corteCalzado: "sandalia" },
+  { id: "sandalias-cuero-negras", nombre: "Sandalias de cuero negras", categoria: "calzado", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["casual"], ocasion: "casual", corteCalzado: "sandalia" },
 
   // --- Camperas ---
   // "entretiempo" en negra/jean/verde militar/piloto -- ninguna lleva
@@ -996,6 +1255,57 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // el enum sin inventar una textura "paño" que no existe.
   { id: "tapado-pano-gris", nombre: "Tapado de paño gris", categoria: "campera", colorHex: "#4A4A4A", textura: "lana", estilo: "clasico", ocasion: "laburo", estacion: "invierno" },
 
+  // --- Campera de gabardina (oficina) -- pedido explícito del usuario:
+  // "sumá al catálogo... campera de gabardina para oficina", en la misma
+  // ronda que llevó la separación formal/oficina hasta el final (ver el
+  // comentario largo en pantalon-vestir-* de más arriba). Mismo criterio
+  // textil que ese pantalón y que pantalon-gabardina-* de más arriba: la
+  // gabardina es justamente la tela real de un sobretodo/trench de
+  // oficina -- sarga cerrada, mate y firme, resistente al uso diario y algo
+  // al agua por lo apretado del tejido (el "trench coat" clásico es
+  // literalmente esta tela) -- tan de oficina como el pantalón homónimo.
+  //
+  // Reusa la silueta genérica de campera a propósito, sin pieza nueva:
+  // esta app no modela el LARGO de un abrigo (un trench real llega a la
+  // rodilla, más largo que una campera de calle), mismo criterio ya
+  // establecido por tapado-pano-gris de acá arriba (paño/lana, invierno) --
+  // es la fibra la que cambia la lectura, no un dibujo aparte por prenda.
+  //
+  // estilo "oficina" + secundario "clasico", igual que pantalon-gabardina-*
+  // -- NUNCA "formal": un sobretodo de gabardina no es una prenda de traje
+  // (no se corta junto con el saco), se usa arriba de un pantalón de
+  // gabardina o de un chino, no de un traje completo. Entretiempo, no
+  // invierno: la gabardina es una tela más liviana y de tejido más
+  // cerrado que el paño de tapado-pano-gris, la contraparte de estación
+  // intermedia de ese mismo rol (sobretodo de oficina), no un duplicado.
+  //
+  // Beige -- el color de gabardina/trench MÁS citado en cualquier
+  // guardarropa real (el trench coat clásico es directamente este color),
+  // mismo hex que ya usa el resto del catálogo (pantalon-gabardina-beige y
+  // compañía). Negro -- el otro sobretodo de oficina real, más neutro.
+  { id: "campera-gabardina-beige", nombre: "Campera de gabardina beige", categoria: "campera", colorHex: "#D8C7A1", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
+  { id: "campera-gabardina-negra", nombre: "Campera de gabardina negra", categoria: "campera", colorHex: "#1A1A1A", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
+
+  // Marrón/camel -- pedido explícito del usuario, con foto adjunta: "agrega
+  // tmb esta campera marrón de gabardina de entre tiempo al catálogo". El
+  // corte de la foto (cuello mao con cierre, sin solapa) es la variante
+  // "bomber/harrington" de esta misma tela -- mismo criterio que
+  // campera-gabardina-beige/negra de acá arriba: la app no modela un corte
+  // de campera aparte por prenda, es la fibra/color lo que cambia la
+  // lectura, y en la silueta genérica de campera un mao-con-cierre y un
+  // cuello clásico de sobretodo se dibujan igual.
+  //
+  // El marrón muestreado por píxel de la foto (~#7D573E) cae en la misma
+  // familia "camel" que el resto del catálogo -- se reusa el hex ya
+  // establecido (#6F4E37, el mismo de pantalon-gabardina-marron,
+  // pantalon-pana-marron y sweater-algodon-marron) en vez de sumar un
+  // cuarto marrón casi idéntico: además de consistencia de paleta, esto
+  // deja que esta campera combine EXACTO con el pantalón de gabardina
+  // marrón ya cargado -- el mismo look de oficina (campera + pantalón, la
+  // misma tela y el mismo tono) que ya arma la foto (campera al tono con
+  // el resto del conjunto).
+  { id: "campera-gabardina-marron", nombre: "Campera de gabardina marrón", categoria: "campera", colorHex: "#6F4E37", textura: "gabardina", estilo: "oficina", estilosSecundarios: ["clasico"], ocasion: "laburo", estacion: "entretiempo" },
+
   // --- Sacos ---
   // Categoría nueva -- pedido explícito del usuario ("quiero que agregues
   // al catálogo... un traje azul marino"). Revisado como modista: un
@@ -1030,7 +1340,7 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // forro pesado, tela suelta que transpira -- verificado por búsqueda
   // web: es la prenda estándar para "traje de verano" (bodas/eventos
   // formales de temporada cálida). Beige, el color de lino más clásico y
-  // el mismo hex que ya usa el resto del catálogo (pantalon-vestir-beige y
+  // el mismo hex que ya usa el resto del catálogo (pantalon-gabardina-beige y
   // compañía) -- consistencia de paleta cross-categoría. calce "regular"
   // (no "ajustado" como el de lana): un saco de lino real es más suelto,
   // parte de por qué transpira mejor.
@@ -1071,6 +1381,13 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // exactamente el que corresponde con un traje real -- no se toca
   // "urbano" (queda afuera a propósito, mismo criterio que pidió el
   // usuario: un cinturón de vestir no es una pieza de streetwear).
+  //
+  // "formal" + "oficina" juntos siguen a propósito tras la ronda de
+  // separación estricta formal/oficina (mismo criterio que camisa-blanca,
+  // ver ese comentario): el usuario, preguntado explícitamente, confirmó
+  // dejar el cinturón compartido -- es el mismo cinturón de cuero puesto
+  // con o sin saco, no dos cinturones de tela distinta como sí pasa con
+  // el pantalón (lana de traje vs. gabardina de oficina).
   { id: "cinturon-negro", nombre: "Cinturón negro de cuero", categoria: "accesorio", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["casual", "formal", "oficina"] },
   { id: "cinturon-marron", nombre: "Cinturón marrón de cuero", categoria: "accesorio", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["casual", "formal", "oficina"] },
   { id: "corbata-azul-marino", nombre: "Corbata azul marino", categoria: "accesorio", colorHex: "#1F2A44", textura: "seda", estilo: "formal", ocasion: "laburo", requiereCuello: true, posicionAccesorio: "cuello" },
@@ -1095,6 +1412,27 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
   // catálogo (buzo/sweater/pantalón/campera/zapatillas). Mismo hex de
   // siempre (#1F2A44) -- consistencia de paleta cross-categoría.
   { id: "bufanda-azul-marino", nombre: "Bufanda azul marino", categoria: "accesorio", colorHex: "#1F2A44", textura: "lana", estilo: "casual", ocasion: "casual", posicionAccesorio: "cuello" },
+
+  // --- Gorro/gorra -- ronda de completitud del catálogo (ver
+  // posicion_accesorio en types.ts), revisada como modista y asesor de
+  // imagen. Hueco real: la única prenda de cabeza posible en todo el
+  // catálogo, hasta esta ronda, era no tener ninguna -- ni siquiera existía
+  // dónde dibujarla.
+  //
+  // Gorro de lana (beanie) -- distinguido de la gorra por textura "lana"
+  // (ver descripcionPrenda en types.ts), mismo criterio real que separa
+  // las dos prendas en cualquier guardarropa: el gorro es de invierno, va
+  // con bufanda/campera de abrigo. Negro y gris -- los dos colores de
+  // gorro más versátiles, mismos hex que el resto del catálogo.
+  { id: "gorro-lana-negro", nombre: "Gorro de lana negro", categoria: "accesorio", colorHex: "#1A1A1A", textura: "lana", estilo: "casual", ocasion: "casual", estacion: "invierno", posicionAccesorio: "cabeza" },
+  { id: "gorro-lana-gris", nombre: "Gorro de lana gris", categoria: "accesorio", colorHex: "#8C8C8C", textura: "lana", estilo: "casual", ocasion: "casual", estacion: "invierno", posicionAccesorio: "cabeza" },
+  // Gorra de visera (algodón) -- la contraparte de todo el año/verano del
+  // gorro: registro urbano/deportivo, no de abrigo (sin `estacion`, mismo
+  // criterio que el resto del calzado/accesorios sin temporada marcada).
+  // Negra y azul marino -- los dos colores de gorra más neutros y
+  // versátiles, mismos hex de siempre.
+  { id: "gorra-negra", nombre: "Gorra negra", categoria: "accesorio", colorHex: "#1A1A1A", textura: "algodon", estilo: "urbano", estilosSecundarios: ["deportivo", "casual"], ocasion: "casual", posicionAccesorio: "cabeza" },
+  { id: "gorra-azul-marino", nombre: "Gorra azul marino", categoria: "accesorio", colorHex: "#1F2A44", textura: "algodon", estilo: "urbano", estilosSecundarios: ["deportivo", "casual"], ocasion: "casual", posicionAccesorio: "cabeza" },
 ];
 
 /** Deriva h/s/l de cada preset una sola vez (no en cada render). hsl2 solo
@@ -1104,6 +1442,7 @@ export const CATALOGO_CON_HSL = CATALOGO_PRENDAS.map((p) => ({
   ...p,
   hsl: hexToHsl(p.colorHex),
   hsl2: p.colorHex2 ? hexToHsl(p.colorHex2) : undefined,
+  hsl3: p.colorHex3 ? hexToHsl(p.colorHex3) : undefined,
 }));
 
 /** Convierte un preset del catálogo en una Prenda sintética -- misma forma
@@ -1120,6 +1459,7 @@ export function presetAPrendaSintetica(preset: PresetPrenda & { hsl: { h: number
   // estampado -- mismo hexToHsl que ya usa CATALOGO_CON_HSL para el color
   // principal.
   const hsl2 = preset.colorHex2 ? hexToHsl(preset.colorHex2) : null;
+  const hsl3 = preset.colorHex3 ? hexToHsl(preset.colorHex3) : null;
   return {
     id: `sugerida-${preset.id}`,
     user_id: "",
@@ -1143,8 +1483,14 @@ export function presetAPrendaSintetica(preset: PresetPrenda & { hsl: { h: number
     color2_h: hsl2?.h ?? null,
     color2_s: hsl2?.s ?? null,
     color2_l: hsl2?.l ?? null,
+    color3_hex: preset.colorHex3 ?? null,
+    color3_h: hsl3?.h ?? null,
+    color3_s: hsl3?.s ?? null,
+    color3_l: hsl3?.l ?? null,
     corte_calzado: preset.corteCalzado ?? "zapatilla_urbana",
     calce: preset.calce ?? "regular",
+    cuello: preset.cuello ?? null,
+    manga: preset.manga ?? null,
     // el catálogo de presets/sugerencias nunca modela una prenda gastada
     // -- necesita_cambio es un dato real de UNA prenda puntual que el
     // usuario ya tiene puesta, no algo que tenga sentido en un preset.

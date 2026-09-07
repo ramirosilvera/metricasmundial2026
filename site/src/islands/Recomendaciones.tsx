@@ -211,8 +211,11 @@ export default function Recomendaciones() {
             conCapucha={base.con_capucha}
             patron={base.patron}
             color2={base.color2_hex}
+            color3={base.color3_hex}
             corteCalzado={base.corte_calzado}
             calce={base.calce}
+            cuello={base.cuello}
+            manga={base.manga}
           />
         </span>
         <div style={{ flex: 1 }}>
@@ -340,8 +343,11 @@ export default function Recomendaciones() {
                         conCapucha={prenda.con_capucha}
                         patron={prenda.patron}
                         color2={prenda.color2_hex}
+                        color3={prenda.color3_hex}
                         corteCalzado={prenda.corte_calzado}
                         calce={prenda.calce}
+                        cuello={prenda.cuello}
+                        manga={prenda.manga}
                       />
                     </span>
                     <div style={{ flex: 1, textAlign: "left" }}>

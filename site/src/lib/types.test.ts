@@ -26,8 +26,14 @@ function mkPrenda(categoria: Prenda["categoria"], overrides: Partial<Prenda> = {
     color2_h: null,
     color2_s: null,
     color2_l: null,
+    color3_hex: null,
+    color3_h: null,
+    color3_s: null,
+    color3_l: null,
     corte_calzado: "zapatilla_urbana",
     calce: "regular",
+    cuello: null,
+    manga: null,
     necesita_cambio: false,
     created_at: "",
     updated_at: "",
@@ -51,6 +57,21 @@ describe("descripcionPrenda", () => {
   it("pantalón/bermuda de lana se describen como de vestir", () => {
     expect(descripcionPrenda(mkPrenda("pantalon", { textura: "lana" }))).toBe("Pantalón de vestir");
     expect(descripcionPrenda(mkPrenda("bermuda", { textura: "lana" }))).toBe("Bermuda de vestir");
+  });
+
+  // Pedido explícito del usuario, revisado como sastre e ingeniero textil:
+  // "los pantalones de vestir que tengo, negro y marrón, que son de
+  // oficina y clásicos, son de gabardina... los formales son otra tela más
+  // suave tipo de traje". El de gabardina (oficina) y el de lana (traje)
+  // son dos prendas distintas de verdad -- misma silueta con raya
+  // planchada, otra fibra y otro registro -- así que la descripción las
+  // nombra por lo que son en la calle, sin mezclarlas.
+  it("pantalón/bermuda de gabardina se describen por su tela (el de oficina), distinto del de lana de traje", () => {
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "gabardina" }))).toBe("Pantalón de gabardina");
+    expect(descripcionPrenda(mkPrenda("bermuda", { textura: "gabardina" }))).toBe("Bermuda de gabardina");
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "lana" }))).not.toBe(
+      descripcionPrenda(mkPrenda("pantalon", { textura: "gabardina" })),
+    );
   });
 
   it("pantalón de algodón clásico es Pantalón chino, casual es Jogger", () => {
@@ -99,18 +120,108 @@ describe("descripcionPrenda", () => {
     expect(descripcionPrenda(mkPrenda("buzo", { con_capucha: false }))).toBe("Buzo sin capucha");
   });
 
+  // Ronda del buzo color-block (pedido explícito del usuario, con foto de
+  // un buzo real de 3 franjas de color): "bloques" pisa la distinción
+  // con/sin capucha -- un buzo color-block se identifica por su paleta,
+  // no por si tiene capucha (el preset agregado al catálogo no la tiene).
+  it("buzo con patron bloques se identifica como color-block, sin importar la capucha", () => {
+    expect(descripcionPrenda(mkPrenda("buzo", { patron: "bloques", con_capucha: false }))).toBe("Buzo color-block");
+    expect(descripcionPrenda(mkPrenda("buzo", { patron: "bloques", con_capucha: true }))).toBe("Buzo color-block");
+  });
+
   it("sweater liviano (no lana) se distingue del sweater de lana genérico", () => {
     expect(descripcionPrenda(mkPrenda("sweater", { textura: "viscosa" }))).toBe("Sweater liviano");
     expect(descripcionPrenda(mkPrenda("sweater", { textura: "lana" }))).toBe("Sweater");
   });
 
-  it("campera de denim/acolchado/poliester/impermeable/tricot se describe específicamente; campera de lana (ambigua) cae al genérico", () => {
+  // Ronda de completitud del catálogo (ver Cuello/Manga en types.ts,
+  // pedido explícito del usuario: "revisá todas las prendas del
+  // catálogo... si se puede completar aún más").
+  it("chomba (remera cuello polo) se distingue de una remera lisa", () => {
+    expect(descripcionPrenda(mkPrenda("remera", { cuello: "polo" }))).toBe("Chomba");
+    expect(descripcionPrenda(mkPrenda("remera", { cuello: "redondo" }))).toBe("Remera");
+    expect(descripcionPrenda(mkPrenda("remera"))).toBe("Remera");
+  });
+
+  it("chaleco (sweater sin mangas) se nombra por la ausencia de mangas, sin importar la fibra", () => {
+    expect(descripcionPrenda(mkPrenda("sweater", { manga: "sin_mangas", textura: "lana" }))).toBe("Chaleco");
+    // aunque también sea de una fibra "liviana" -- sin_mangas manda primero,
+    // no cae en "Sweater liviano".
+    expect(descripcionPrenda(mkPrenda("sweater", { manga: "sin_mangas", textura: "viscosa" }))).toBe("Chaleco");
+  });
+
+  it("sweater cuello alto se distingue del genérico y del liviano", () => {
+    expect(descripcionPrenda(mkPrenda("sweater", { cuello: "alto", textura: "lana" }))).toBe("Sweater cuello alto");
+    // cuello alto manda antes que el chequeo de fibra liviana.
+    expect(descripcionPrenda(mkPrenda("sweater", { cuello: "alto", textura: "viscosa" }))).toBe("Sweater cuello alto");
+  });
+
+  it("camisa manga corta se distingue de la de manga larga, después del patrón", () => {
+    expect(descripcionPrenda(mkPrenda("camisa", { manga: "corta" }))).toBe("Camisa manga corta");
+    expect(descripcionPrenda(mkPrenda("camisa", { manga: "larga" }))).toBe("Camisa");
+    expect(descripcionPrenda(mkPrenda("camisa"))).toBe("Camisa");
+    // el patrón sigue siendo más específico: una camisa a rayas de manga
+    // corta se sigue leyendo "a rayas" primero.
+    expect(descripcionPrenda(mkPrenda("camisa", { manga: "corta", patron: "rayas" }))).toBe("Camisa a rayas");
+  });
+
+  it("gorro de lana vs. gorra, distinguidos por textura", () => {
+    expect(descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cabeza", textura: "lana" }))).toBe(
+      "Gorro de lana",
+    );
+    expect(descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cabeza", textura: "algodon" }))).toBe(
+      "Gorra",
+    );
+  });
+
+  it("campera de denim/acolchado/poliester/impermeable/tricot se describe específicamente; campera de lana SIN estación (ambigua) cae al genérico", () => {
     expect(descripcionPrenda(mkPrenda("campera", { textura: "denim" }))).toBe("Campera de jean");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "acolchado" }))).toBe("Campera de pluma");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "poliester" }))).toBe("Campera rompeviento");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "impermeable" }))).toBe("Campera impermeable");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "tricot" }))).toBe("Campera deportiva");
     expect(descripcionPrenda(mkPrenda("campera", { textura: "lana" }))).toBe("Campera");
+  });
+
+  // Ronda de nombres específicos (pedido explícito del usuario: "necesito
+  // que los nombres de las prendas de mi placard y del outfit sean más
+  // específicos para que los pueda reconocer"), revisada como sastre,
+  // ingeniero textil y asesor de imagen. Corriendo descripcionPrenda contra
+  // el placard real del usuario se encontraron varios huecos reales --
+  // cada uno cubierto por un test acá.
+  it("campera de lana CON estación se desambigua: invierno -> tapado, entretiempo -> campera sweater", () => {
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "lana", estacion: "invierno" }))).toBe("Tapado de paño");
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "lana", estacion: "entretiempo" }))).toBe("Campera sweater");
+    // verano no tiene un archetype real de campera de lana -- sigue
+    // cayendo al genérico, no se inventa un tercer nombre sin sentido.
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "lana", estacion: "verano" }))).toBe("Campera");
+  });
+
+  it("campera/pantalón/bermuda de pana (o su sinónimo corderoy) se describen específicamente", () => {
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "pana" }))).toBe("Campera de pana");
+    expect(descripcionPrenda(mkPrenda("campera", { textura: "corderoy" }))).toBe("Campera de pana");
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "pana" }))).toBe("Pantalón de pana");
+    expect(descripcionPrenda(mkPrenda("pantalon", { textura: "corderoy" }))).toBe("Pantalón de pana");
+    expect(descripcionPrenda(mkPrenda("bermuda", { textura: "corderoy" }))).toBe("Bermuda de pana");
+  });
+
+  it("bermuda de algodón clásico es Bermuda chino, pareja de Pantalón chino", () => {
+    expect(descripcionPrenda(mkPrenda("bermuda", { textura: "algodon", estilo: "clasico" }))).toBe("Bermuda chino");
+  });
+
+  it("remera deportiva (poliéster) y remera a rayas se describen específicamente", () => {
+    expect(descripcionPrenda(mkPrenda("remera", { textura: "poliester" }))).toBe("Remera deportiva");
+    expect(descripcionPrenda(mkPrenda("remera", { patron: "rayas" }))).toBe("Remera a rayas");
+  });
+
+  it("cinturón/corbata/bufanda se distinguen por posicion_accesorio + requiere_cuello -- antes las tres eran 'Accesorio' a secas", () => {
+    expect(descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cintura" }))).toBe("Cinturón");
+    expect(
+      descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cuello", requiere_cuello: true })),
+    ).toBe("Corbata");
+    expect(
+      descripcionPrenda(mkPrenda("accesorio", { posicion_accesorio: "cuello", requiere_cuello: false })),
+    ).toBe("Bufanda");
   });
 
   it("sin textura cargada, cae en CATEGORIA_LABEL capitalizado", () => {
@@ -142,6 +253,10 @@ describe("descripcionPrenda", () => {
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapato_vestir" }))).toBe("Zapatos de vestir");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "mocasin" }))).toBe("Mocasines");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapatilla_lona" }))).toBe("Zapatillas de lona");
+    // botín/sandalia -- ronda de completitud del catálogo (ver
+    // CorteCalzado en types.ts).
+    expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "botin" }))).toBe("Botines");
+    expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "sandalia" }))).toBe("Sandalias");
   });
 });
 

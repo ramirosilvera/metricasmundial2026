@@ -36,8 +36,14 @@ function mkPrenda(
     color2_h: null,
     color2_s: null,
     color2_l: null,
+    color3_hex: null,
+    color3_h: null,
+    color3_s: null,
+    color3_l: null,
     corte_calzado: "zapatilla_urbana",
     calce: "regular",
+    cuello: null,
+    manga: null,
     necesita_cambio: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -434,6 +440,23 @@ describe("coincideBusqueda", () => {
     expect(coincideBusqueda(p, "pantalon")).toBe(true);
     expect(coincideBusqueda(p, "Pantalon")).toBe(true);
     expect(coincideBusqueda(p, "remera")).toBe(false);
+  });
+
+  // Bug real encontrado en la ronda de nombres específicos: al corregir
+  // CATEGORIA_LABEL.pantalon (le faltaba la tilde) salió a la luz que este
+  // buscador nunca tuvo el acento-insensible que su propio comentario ya
+  // prometía -- comparaba con `.includes()` puro, así que buscar sin
+  // tilde ("pantalon") dejaba de encontrar "Pantalón" apenas la categoría
+  // empezó a escribirse bien. Se prueban las dos direcciones: buscar sin
+  // tilde sobre texto con tilde, y buscar CON tilde sobre un texto que la
+  // tenga -- las dos tienen que matchear igual, mayúsculas incluidas.
+  it("es acento-insensible: buscar sin tilde encuentra texto con tilde y viceversa", () => {
+    const p = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    p.textura = "lana"; // descripcionPrenda -> "Pantalón de vestir"
+    expect(coincideBusqueda(p, "vestir")).toBe(true);
+    expect(coincideBusqueda(p, "pantalon")).toBe(true); // sin tilde
+    expect(coincideBusqueda(p, "pantalón")).toBe(true); // con tilde
+    expect(coincideBusqueda(p, "PANTALÓN")).toBe(true); // con tilde y mayúsculas
   });
 
   it("matchea por color (substring, sin importar mayúsculas)", () => {

@@ -157,7 +157,11 @@ describe("contornoHsl / sombraHsl / luzHsl", () => {
   });
 
   it("contornoHsl con blanco puro (l=100) sigue dando un contorno visible, no blanco", () => {
-    expect(contornoHsl(0, 0, 100)).toBe("hsl(0 5% 74%)");
+    // un neutro puro (s=0) NO se lleva el +5 de saturación -- ver
+    // saturacionRealzada en color.ts: sumarle saturación a un gris con h=0
+    // no lo realza, le inventa un matiz rojo (bug real visto en el render
+    // del catálogo completo).
+    expect(contornoHsl(0, 0, 100)).toBe("hsl(0 0% 74%)");
   });
 
   it("sombraHsl y luzHsl mueven la luminosidad en direcciones opuestas sin tocar matiz/saturación", () => {
@@ -179,7 +183,7 @@ describe("tonoTexturaHsl", () => {
   // oscura choca contra el piso (4%) y el patrón se funde con el relleno.
   it("sobre una prenda oscura (l<25), ACLARA en vez de oscurecer más -- mismo criterio que detalleHsl para el cuello de una prenda negra", () => {
     const tono = tonoTexturaHsl(0, 0, 16); // sweater negro real, #2A2A2A
-    expect(tono).toBe("hsl(0 5% 36%)");
+    expect(tono).toBe("hsl(0 0% 36%)"); // neutro: sigue neutro, ver saturacionRealzada
     expect(36).toBeGreaterThan(16); // más claro que la base -- contraste garantizado
   });
 
@@ -189,8 +193,89 @@ describe("tonoTexturaHsl", () => {
   });
 
   it("no cruza los límites 4%/85% en los extremos", () => {
-    expect(tonoTexturaHsl(0, 0, 0)).toBe("hsl(0 5% 20%)");
-    expect(tonoTexturaHsl(0, 0, 100)).toBe("hsl(0 5% 82%)");
+    expect(tonoTexturaHsl(0, 0, 0)).toBe("hsl(0 0% 20%)");
+    expect(tonoTexturaHsl(0, 0, 100)).toBe("hsl(0 0% 82%)");
+  });
+});
+
+describe("saturacionDerivada -- un derivado nunca muestra más color que su prenda", () => {
+  // Bug real encontrado renderizando el catálogo completo (Consejo, ronda
+  // "los íconos más parecidos a la prenda real"): contorno/trama/detalle
+  // sumaban saturación SIEMPRE, y como todos los negros y grises del
+  // catálogo se guardan con h=0, eso no los realzaba: les inventaba un
+  // matiz rojo. En el render se veía la raya planchada de un pantalón de
+  // vestir negro marrón rojiza y el perforado de un zapato negro
+  // anaranjado. Ver saturacionRealzada en color.ts.
+  const negro = { h: 0, s: 0, l: 10 }; // #1A1A1A, el negro estándar del catálogo
+  const gris = { h: 0, s: 0, l: 43 }; // #6E6E6E, el gris estándar del catálogo
+  // el negro de cuero del catálogo (zapatos-cuero-negro/mocasines-negros):
+  // s=27 -- por encima de cualquier umbral sobre `s` -- pero croma 5, o sea
+  // negro a la vista. Con un umbral sobre `s` a secas, el perforado del
+  // zapato salía color óxido sobre un zapato que se ve negro.
+  const negroCuero = hexToHsl("#1C1210");
+
+  // croma HSL real (s desnormalizado por l) -- la magnitud que dice cuánto
+  // color se VE, ver cromaHsl en color.ts y `croma` en recommend.ts. Se
+  // mide sobre el croma y no sobre `s` justamente por el caso del negro de
+  // cuero: mantenerle `s` intacta pero aclararlo hace reaparecer el matiz.
+  const cromaDe = (css: string) => {
+    const [, sTxt, lTxt] = /hsl\(\S+ ([\d.]+)% ([\d.]+)%\)/.exec(css)!;
+    const s = Number(sTxt);
+    const l = Number(lTxt);
+    return s * (1 - Math.abs((2 * l) / 100 - 1));
+  };
+
+  const marronCuero = hexToHsl("#6F4E37"); // el marrón cuero del catálogo
+  const marino = hexToHsl("#1F2A44"); // azul marino real del catálogo
+
+  it("ningún derivado muestra más color que la prenda de la que sale (tope 1.25x)", () => {
+    for (const c of [negro, gris, negroCuero, marronCuero, marino, { h: 220, s: 60, l: 50 }]) {
+      const cromaPrenda = cromaDe(`hsl(${c.h} ${c.s}% ${c.l}%)`);
+      for (const fn of [contornoHsl, tonoTexturaHsl, detalleHsl]) {
+        // +0.1 de tolerancia por el redondeo del string.
+        expect(cromaDe(fn(c.h, c.s, c.l))).toBeLessThanOrEqual(cromaPrenda * 1.25 + 0.1);
+      }
+    }
+  });
+
+  it("los dos casos que lo motivaron: el negro de cuero no saca óxido y el marrón de cuero no saca naranja", () => {
+    // el perforado del zapato negro y la tira del mocasín negro
+    expect(cromaDe(detalleHsl(negroCuero.h, negroCuero.s, negroCuero.l))).toBeLessThan(8);
+    // la costura del zapato marrón y la tira del mocasín marrón: seguía
+    // siendo cuero, no un naranja flúo de casi el doble de croma
+    expect(cromaDe(detalleHsl(marronCuero.h, marronCuero.s, marronCuero.l))).toBeLessThan(
+      cromaDe(`hsl(${marronCuero.h} ${marronCuero.s}% ${marronCuero.l}%)`) * 1.3,
+    );
+  });
+
+  it("un color con matiz real sigue leyéndose de color -- el tope acota, no apaga", () => {
+    for (const c of [marronCuero, marino, { h: 220, s: 60, l: 50 }]) {
+      for (const fn of [contornoHsl, tonoTexturaHsl, detalleHsl]) {
+        const [, hTxt, sTxt] = /hsl\((\S+) ([\d.]+)%/.exec(fn(c.h, c.s, c.l))!;
+        // el matiz nunca se toca: un derivado es la misma tela a otra luz.
+        expect(Number(hTxt)).toBe(c.h);
+        // y sigue por encima del umbral de "neutro" del motor (s<=15, ver
+        // esNeutro en recommend.ts): el detalle de una prenda marrón se
+        // lee marrón, no gris.
+        expect(Number(sTxt)).toBeGreaterThan(15);
+      }
+    }
+  });
+
+  // Las dos funciones que existen justamente para VERSE sobre una prenda
+  // oscura (ver sus comentarios en color.ts: las dos aclaran en vez de
+  // oscurecer cuando la prenda ya es oscura) siguen dando ese contraste con
+  // pura luz, sin necesitar el matiz inventado. contornoHsl queda afuera a
+  // propósito: es un contorno, siempre oscurece, y sobre un negro llega al
+  // piso de 4% -- ahí el +5 de saturación que se le sacó no aportaba
+  // contraste real (5% de saturación sobre 4% de luz es imperceptible), a
+  // diferencia de lo que sí pasaba en trama y detalle, que aclaran hasta
+  // 32-36% de luz, donde ese matiz rojo se veía de verdad.
+  it("trama y detalle siguen dando contraste de LUZ sobre un negro -- que es lo que los hace visibles", () => {
+    for (const fn of [tonoTexturaHsl, detalleHsl]) {
+      const l = Number(/(\d+(?:\.\d+)?)%\)$/.exec(fn(negro.h, negro.s, negro.l))![1]);
+      expect(Math.abs(l - negro.l)).toBeGreaterThanOrEqual(10);
+    }
   });
 });
 
@@ -205,7 +290,7 @@ describe("detalleHsl", () => {
     // era casi negro y el cuello quedaba invisible. detalleHsl tiene que ir
     // para el otro lado en vez de seguir oscureciendo.
     const oscuro = detalleHsl(0, 0, 14);
-    expect(oscuro).toBe("hsl(0 10% 36%)");
+    expect(oscuro).toBe("hsl(0 0% 36%)"); // neutro: sigue neutro, ver saturacionRealzada
     expect(36).toBeGreaterThan(14); // más claro que la prenda base, no más oscuro
   });
 
@@ -219,7 +304,7 @@ describe("detalleHsl", () => {
   });
 
   it("no cruza los límites 4%/92% en los extremos", () => {
-    expect(detalleHsl(0, 0, 0)).toBe("hsl(0 10% 22%)");
+    expect(detalleHsl(0, 0, 0)).toBe("hsl(0 0% 22%)");
     expect(detalleHsl(0, 0, 100)).toBe("hsl(0 0% 75%)");
   });
 });

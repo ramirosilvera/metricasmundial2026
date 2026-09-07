@@ -610,8 +610,26 @@ export function analizarFoda(placard: Prenda[]): AnalisisFoda {
  *  acentos de más ni nada raro: "azul" matchea "Azul oscuro". Query vacía o
  *  solo espacios -> matchea todo (comportamiento de "sin filtro", no de
  *  "sin resultados"). */
+// Ronda de nombres específicos (pedido explícito del usuario: "necesito
+// que los nombres de las prendas... sean más específicos para que los
+// pueda reconocer"): al corregir CATEGORIA_LABEL.pantalon (le faltaba la
+// tilde -- ver ese comentario en types.ts) salió a la luz que este
+// buscador nunca tuvo el acento-insensible que su propio comentario ya
+// prometía ("sin distinguir mayúsculas/acentos de más") -- comparaba con
+// `.includes()` puro, así que escribir "pantalon" sin tilde dejaba de
+// encontrar "Pantalón" apenas la categoría empezó a mostrarse bien
+// escrita. Bug real, no cosmético: la mayoría de teclados y hábitos de
+// escritura casual en español omiten tildes, así que un buscador que las
+// exige de verdad falla justo en el caso más común.
+function normalizarBusqueda(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 export function coincideBusqueda(p: Prenda, query: string): boolean {
-  const q = query.trim().toLowerCase();
+  const q = normalizarBusqueda(query.trim());
   if (!q) return true;
   const textos = [
     descripcionPrenda(p),
@@ -620,5 +638,5 @@ export function coincideBusqueda(p: Prenda, query: string): boolean {
     ...estilosDe(p).map((e) => ESTILO_LABEL[e]),
     p.estacion ? ESTACION_LABEL[p.estacion] : "",
   ];
-  return textos.some((t) => t.toLowerCase().includes(q));
+  return textos.some((t) => normalizarBusqueda(t).includes(q));
 }

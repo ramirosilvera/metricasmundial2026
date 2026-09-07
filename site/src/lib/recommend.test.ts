@@ -1300,7 +1300,7 @@ describe("prendaMenosFormalQuePantalon / advertenciasDeRegistro -- ancla al esti
     zapatillaUrbana.corte_calzado = "zapatilla_urbana";
     // sin el 2do argumento, sigue anclando al principal del pantalón
     // ("clasico", rango 2) -- comportamiento de siempre, sin cambios.
-    expect(advertenciasDeRegistro([pantalon, zapatillaUrbana])).toEqual(["calzado más informal que el pantalon"]);
+    expect(advertenciasDeRegistro([pantalon, zapatillaUrbana])).toEqual(["calzado más informal que el pantalón"]);
   });
 
   it("mismo caso, pasando 'urbano' como el estilo evaluado -- el aviso ya no dispara, la zapatilla es genuinamente urbana", () => {
@@ -1427,7 +1427,7 @@ describe("registroOutfit / advertenciasDeRegistro", () => {
     remeraFormal.estilo = "casual";
     remeraFormal.estilos_secundarios = ["urbano", "clasico", "formal"];
     const avisos = advertenciasDeRegistro([pantalonVestir, remeraFormal]);
-    expect(avisos).toEqual(["remera más informal que el pantalon"]);
+    expect(avisos).toEqual(["remera más informal que el pantalón"]);
   });
 
   it("mismo caso pero con la remera tageada 'clasico' puro -- también avisa (clasico y formal comparten rango 2)", () => {
@@ -1437,7 +1437,7 @@ describe("registroOutfit / advertenciasDeRegistro", () => {
     remeraClasica.estilo = "clasico";
     remeraClasica.estilos_secundarios = ["casual"];
     const avisos = advertenciasDeRegistro([pantalonVestir, remeraClasica]);
-    expect(avisos).toEqual(["remera más informal que el pantalon"]);
+    expect(avisos).toEqual(["remera más informal que el pantalón"]);
   });
 
   it("el techo no inventa avisos donde antes no había -- una remera 'clasico' sigue sin chocar contra un pantalón 'casual'", () => {
@@ -1472,13 +1472,13 @@ describe("registroOutfit / advertenciasDeRegistro", () => {
     zapatillaUrbana.estilo = "urbano";
     zapatillaUrbana.estilos_secundarios = ["casual", "clasico"];
     zapatillaUrbana.corte_calzado = "zapatilla_urbana";
-    expect(advertenciasDeRegistro([pantalonVestir, zapatillaUrbana])).toEqual(["calzado más informal que el pantalon"]);
+    expect(advertenciasDeRegistro([pantalonVestir, zapatillaUrbana])).toEqual(["calzado más informal que el pantalón"]);
 
     const zapatillaRunning = { ...zapatillaUrbana, corte_calzado: "zapatilla_running" as const };
-    expect(advertenciasDeRegistro([pantalonVestir, zapatillaRunning])).toEqual(["calzado más informal que el pantalon"]);
+    expect(advertenciasDeRegistro([pantalonVestir, zapatillaRunning])).toEqual(["calzado más informal que el pantalón"]);
 
     const zapatillaLona = { ...zapatillaUrbana, corte_calzado: "zapatilla_lona" as const };
-    expect(advertenciasDeRegistro([pantalonVestir, zapatillaLona])).toEqual(["calzado más informal que el pantalon"]);
+    expect(advertenciasDeRegistro([pantalonVestir, zapatillaLona])).toEqual(["calzado más informal que el pantalón"]);
   });
 
   it("un zapato de vestir o un mocasín SÍ pueden ser genuinamente formales/clásicos -- el techo de calzado no los toca", () => {
@@ -4234,7 +4234,7 @@ describe("torsoYPiernasCasiIdenticos", () => {
     const zapatillas = mkPrenda("calzado", "#1A1A1A", 0, 0, 10);
     const r = puntuarOutfit([jean, buzo, zapatillas]);
     expect(r.puntaje).toBe(9);
-    expect(r.explicacion).toContain("pantalon y buzo son prácticamente el mismo color");
+    expect(r.explicacion).toContain("pantalón y buzo son prácticamente el mismo color");
     expect(r.explicacion).toContain("puede quedar plano");
   });
 });
@@ -4558,8 +4558,14 @@ function mkPrenda(
     color2_h: null,
     color2_s: null,
     color2_l: null,
+    color3_hex: null,
+    color3_h: null,
+    color3_s: null,
+    color3_l: null,
     corte_calzado: "zapatilla_urbana",
     calce: "regular",
+    cuello: null,
+    manga: null,
     necesita_cambio: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

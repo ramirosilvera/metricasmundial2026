@@ -110,6 +110,39 @@ describe("catálogo -- buzo: peso por textura Y por estación (mapeadas una a la
   });
 });
 
+// Pedido explícito del usuario, con foto adjunta de la prenda real: "agrega
+// la prenda de la captura adjunta al catálogo. Es un buzo de entretiempo.
+// Presta atención a la combinación de colores." -- un buzo de 3 franjas
+// horizontales (greige/crema/blanco) que introdujo el patron "bloques" (ver
+// types.ts) y el tercer color (color3_hex) en todo el sistema, ninguno de
+// los cuales existía antes de esta ronda.
+describe("catálogo -- buzo color-block (pedido explícito del usuario, con foto de la prenda real)", () => {
+  const colorblock = CATALOGO_PRENDAS.find((p) => p.id === "buzo-colorblock-greige");
+
+  it("existe y es un buzo con patron bloques", () => {
+    expect(colorblock).toBeDefined();
+    expect(colorblock?.categoria).toBe("buzo");
+    expect(colorblock?.patron).toBe("bloques");
+  });
+
+  it("lleva los 3 colores muestreados de la foto (greige/crema/blanco), no solo 2", () => {
+    expect(colorblock?.colorHex).toBeDefined();
+    expect(colorblock?.colorHex2).toBeDefined();
+    expect(colorblock?.colorHex3).toBeDefined();
+    // Las 3 franjas son tonos de la misma familia (greige->crema->blanco),
+    // a propósito distinto de las camisas a rayas de arriba (que sí
+    // contrastan fondo/raya) -- "presta atención a la combinación de
+    // colores" del usuario era justamente evitar inventar un contraste que
+    // la prenda real no tiene.
+    expect(colorblock?.colorHex).not.toBe(colorblock?.colorHex2);
+    expect(colorblock?.colorHex2).not.toBe(colorblock?.colorHex3);
+  });
+
+  it("es de entretiempo, como pidió el usuario explícitamente", () => {
+    expect(colorblock?.estacion).toBe("entretiempo");
+  });
+});
+
 describe("catálogo -- jean/jogger son urbano sin importar el color", () => {
   // Pedido explícito del usuario, con un caso real: cargó "Jean azul" desde
   // el catálogo y "Vestite hoy" no lo reconocía como Urbano. Causa real: una
@@ -153,6 +186,67 @@ describe("catálogo -- saco (categoría nueva, pedido explícito del usuario: 'u
     const corbataAzul = CATALOGO_PRENDAS.find((p) => p.categoria === "accesorio" && p.requiereCuello && p.colorHex === "#1F2A44");
     expect(pantalonVestirAzul).toBeDefined();
     expect(corbataAzul).toBeDefined();
+  });
+});
+
+// Pedido explícito del usuario, revisado como sastre e ingeniero textil:
+// "los pantalones de vestir que tengo en mi placard, negro y marrón, que
+// son de oficina y clásicos, son de gabardina... quizás en el catálogo
+// también podés distinguir los pantalones de vestir de oficina, que son
+// típicamente de gabardina, y los formales, que son otra tela más suave
+// tipo de traje". Hueco real: hasta esta ronda TODO pantalón de vestir del
+// catálogo era "lana", así que la prenda que más se usa para ir a trabajar
+// no existía como tal, y encima no había NINGÚN pantalón de vestir marrón.
+describe("catálogo -- pantalón de vestir: gabardina (oficina) vs. lana de traje (formal)", () => {
+  const pantalones = CATALOGO_PRENDAS.filter((p) => p.categoria === "pantalon");
+  const deLana = pantalones.filter((p) => p.textura === "lana");
+  const deGabardina = pantalones.filter((p) => p.textura === "gabardina");
+
+  it("existen las dos telas de pantalón de vestir, no una sola", () => {
+    expect(deLana.length).toBeGreaterThan(0);
+    expect(deGabardina.length).toBeGreaterThan(0);
+  });
+
+  // Separación estricta formal/oficina -- pedido explícito del usuario:
+  // "separá el filtro de formal y oficina con el mismo criterio que lo
+  // hicimos en mi placard" (llevó él mismo sus pantalones de lana a
+  // "formal" puro y sus pantalones de oficina a "oficina" puro, sin
+  // secundario cruzado, al cargar su placard real). Antes de esta ronda
+  // el de lana llevaba "oficina" de secundario -- corregido: si la
+  // gabardina existe para ser la tela DE oficina sin ambigüedad, la lana
+  // de traje tiene que ser simétricamente formal puro.
+  it("el de lana es el de TRAJE: formal puro, sin secundario oficina", () => {
+    for (const p of deLana) {
+      expect(p.estilo).toBe("formal");
+      expect(p.estilosSecundarios ?? []).not.toContain("oficina");
+    }
+  });
+
+  it("el de gabardina es el de OFICINA: nunca formal -- no es un pantalón de traje", () => {
+    for (const p of deGabardina) {
+      expect(p.estilo).toBe("oficina");
+      expect([p.estilo, ...(p.estilosSecundarios ?? [])]).not.toContain("formal");
+    }
+  });
+
+  it("los de lana cubren los tres colores de traje reales (negro, gris, azul marino)", () => {
+    const hex = deLana.map((p) => p.colorHex);
+    expect(hex).toContain("#1A1A1A");
+    expect(hex).toContain("#6E6E6E");
+    expect(hex).toContain("#1F2A44");
+  });
+
+  it("la gabardina cubre los dos colores que el usuario tiene de verdad (negro y marrón)", () => {
+    const hex = deGabardina.map((p) => p.colorHex);
+    expect(hex).toContain("#1A1A1A");
+    expect(hex).toContain("#6F4E37");
+  });
+
+  it("los dos llevan calce ajustado y ocasión laburo -- misma silueta de sastrería, lo que cambia es la tela", () => {
+    for (const p of [...deLana, ...deGabardina]) {
+      expect(p.calce).toBe("ajustado");
+      expect(p.ocasion).toBe("laburo");
+    }
   });
 });
 
@@ -218,7 +312,12 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
   // Superstar) es un diseño de calle/lifestyle, no de zapatilla técnica de
   // entrenamiento, por eso urbano != deportivo acá (ver el comentario largo
   // de CorteCalzado en types.ts).
-  it("cada registro usa el arquetipo real que le corresponde", () => {
+  // `some` y no `every` desde la ronda de completitud del catálogo: el
+  // botín (ver CorteCalzado en types.ts) es un segundo arquetipo
+  // legítimo de los registros clásico y urbano -- un guardarropa real
+  // tiene mocasines Y botines, no uno solo por registro. Lo que sigue
+  // siendo un invariante es que el arquetipo de cada registro ESTÉ.
+  it("cada registro tiene presente el arquetipo real que le corresponde", () => {
     const mapeo: Record<string, CorteCalzado> = {
       urbano: "zapatilla_urbana",
       deportivo: "zapatilla_running",
@@ -229,7 +328,7 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
     for (const [estilo, corte] of Object.entries(mapeo)) {
       const deEseEstilo = calzado.filter((p) => p.estilo === estilo);
       expect(deEseEstilo.length, estilo).toBeGreaterThan(0);
-      expect(deEseEstilo.every((p) => p.corteCalzado === corte), estilo).toBe(true);
+      expect(deEseEstilo.some((p) => p.corteCalzado === corte), estilo).toBe(true);
     }
   });
 
@@ -241,5 +340,134 @@ describe("catálogo -- calzado con corte real por registro (pedido explícito de
     const lona = calzado.filter((p) => p.corteCalzado === "zapatilla_lona");
     expect(lona.length).toBeGreaterThan(0);
     expect(lona.every((p) => p.textura !== "cuero_liso")).toBe(true);
+  });
+
+  // Ronda de completitud del catálogo, revisada como modista y asesor de
+  // imagen: los cinco cortes anteriores son TODOS calzado bajo, así que un
+  // placard armado con este catálogo no tenía con qué vestirse los pies en
+  // invierno -- en una app que separa invierno/entretiempo/verano en todas
+  // las demás categorías de abrigo.
+  it("hay botines de cuero (el único calzado de caña alta) en registro clásico y urbano", () => {
+    const botines = calzado.filter((p) => p.corteCalzado === "botin");
+    expect(botines.length).toBeGreaterThan(0);
+    expect(botines.every((p) => p.textura === "cuero_liso")).toBe(true);
+    const registros = botines.flatMap((p) => [p.estilo, ...(p.estilosSecundarios ?? [])]);
+    expect(registros).toContain("clasico");
+    expect(registros).toContain("urbano");
+  });
+
+  // Sin estacion a propósito: un botín se usa de otoño a primavera, no solo
+  // con frío extremo -- tagearlo "invierno" lo sacaría de todos los outfits
+  // de entretiempo, que es justo cuando más se usa.
+  it("ningún calzado fuerza `estacion` -- tampoco el botín", () => {
+    expect(calzado.every((p) => !p.estacion)).toBe(true);
+  });
+
+  // Sandalias -- ronda de completitud del catálogo (ver CorteCalzado en
+  // types.ts): la contraparte de verano del botín. Sin ella, un placard
+  // armado con este catálogo no tenía calzado real de verano/calle, solo
+  // zapatilla cerrada todo el año.
+  it("hay sandalias de cuero", () => {
+    const sandalias = calzado.filter((p) => p.corteCalzado === "sandalia");
+    expect(sandalias.length).toBeGreaterThan(0);
+    expect(sandalias.every((p) => p.textura === "cuero_liso")).toBe(true);
+  });
+});
+
+// Ronda de completitud del catálogo (pedido explícito del usuario: "revisá
+// todas las prendas del catálogo, quiero que me digas si está completo o
+// se puede completar aún más"), revisada como modista y asesor de imagen.
+describe("catálogo -- chomba/polo (ver Cuello en types.ts)", () => {
+  const chombas = CATALOGO_PRENDAS.filter((p) => p.categoria === "remera" && p.cuello === "polo");
+
+  it("existe al menos una chomba, categoria remera con cuello polo", () => {
+    expect(chombas.length).toBeGreaterThan(0);
+  });
+
+  it("es de registro clasico (smart-casual), no formal ni deportivo", () => {
+    expect(chombas.every((p) => p.estilo === "clasico")).toBe(true);
+  });
+});
+
+describe("catálogo -- chaleco (sweater sin mangas, ver Manga en types.ts)", () => {
+  const chalecos = CATALOGO_PRENDAS.filter((p) => p.categoria === "sweater" && p.manga === "sin_mangas");
+
+  it("existe al menos un chaleco", () => {
+    expect(chalecos.length).toBeGreaterThan(0);
+  });
+
+  it("es de lana e invierno, mismo criterio textil que el resto de los sweaters de oficina", () => {
+    expect(chalecos.every((p) => p.textura === "lana" && p.estacion === "invierno")).toBe(true);
+  });
+});
+
+describe("catálogo -- sweater cuello alto (ver Cuello en types.ts)", () => {
+  it("sweater-cuello-alto-negro declara cuello 'alto' explícitamente", () => {
+    const p = CATALOGO_PRENDAS.find((p) => p.id === "sweater-cuello-alto-negro");
+    expect(p?.cuello).toBe("alto");
+  });
+});
+
+describe("catálogo -- camisa de manga corta (ver Manga en types.ts)", () => {
+  const mangaCorta = CATALOGO_PRENDAS.filter((p) => p.categoria === "camisa" && p.manga === "corta");
+
+  it("existe al menos una camisa de manga corta", () => {
+    expect(mangaCorta.length).toBeGreaterThan(0);
+  });
+
+  it("es de registro oficina/laburo, como el resto de las camisas lisas de oficina", () => {
+    expect(mangaCorta.every((p) => p.estilosSecundarios?.includes("oficina"))).toBe(true);
+  });
+});
+
+describe("catálogo -- gorro/gorra (posicion_accesorio 'cabeza', ver types.ts)", () => {
+  const deCabeza = CATALOGO_PRENDAS.filter((p) => p.categoria === "accesorio" && p.posicionAccesorio === "cabeza");
+  const gorros = deCabeza.filter((p) => p.textura === "lana");
+  const gorras = deCabeza.filter((p) => p.textura !== "lana");
+
+  it("hay al menos un gorro de lana y una gorra", () => {
+    expect(gorros.length).toBeGreaterThan(0);
+    expect(gorras.length).toBeGreaterThan(0);
+  });
+
+  it("el gorro de lana lleva estacion invierno; la gorra no está atada a una estación", () => {
+    expect(gorros.every((p) => p.estacion === "invierno")).toBe(true);
+    expect(gorras.every((p) => !p.estacion)).toBe(true);
+  });
+});
+
+// Pedido explícito del usuario: "sumá al catálogo... campera de gabardina
+// para oficina", en la misma ronda que separó formal/oficina de forma
+// estricta (ver el describe de pantalón de vestir más arriba).
+describe("catálogo -- campera de gabardina (oficina)", () => {
+  const camperasGabardina = CATALOGO_PRENDAS.filter((p) => p.categoria === "campera" && p.textura === "gabardina");
+
+  it("existe al menos una campera de gabardina", () => {
+    expect(camperasGabardina.length).toBeGreaterThan(0);
+  });
+
+  it("es de oficina, nunca formal -- un sobretodo de gabardina no es una prenda de traje", () => {
+    for (const p of camperasGabardina) {
+      expect(p.estilo).toBe("oficina");
+      expect([p.estilo, ...(p.estilosSecundarios ?? [])]).not.toContain("formal");
+    }
+  });
+
+  it("es de entretiempo, la contraparte liviana del tapado de paño (lana/invierno)", () => {
+    expect(camperasGabardina.every((p) => p.estacion === "entretiempo")).toBe(true);
+  });
+
+  // Pedido explícito del usuario, ronda siguiente, con foto adjunta:
+  // "agrega tmb esta campera marrón de gabardina de entre tiempo al
+  // catálogo". Reusa a propósito el mismo hex camel que ya usa
+  // pantalon-gabardina-marron (ver ese describe más arriba) para que las
+  // dos prendas combinen EXACTO como conjunto de oficina, en vez de sumar
+  // un cuarto marrón casi idéntico al catálogo.
+  it("hay una campera de gabardina marrón, al mismo tono camel que el pantalón de gabardina marrón", () => {
+    const marron = camperasGabardina.find((p) => p.id === "campera-gabardina-marron");
+    expect(marron).toBeDefined();
+    expect(marron?.colorHex).toBe("#6F4E37");
+    const pantalonMarron = CATALOGO_PRENDAS.find((p) => p.id === "pantalon-gabardina-marron");
+    expect(marron?.colorHex).toBe(pantalonMarron?.colorHex);
   });
 });
