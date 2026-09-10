@@ -1004,6 +1004,43 @@ export const CATALOGO_PRENDAS: PresetPrenda[] = [
     ocasion: "casual",
     corteCalzado: "mocasin",
   },
+  // zapatillas de cuero (sneaker minimalista, tipo Common Projects/Koio) --
+  // Consejo, ronda siguiente, pedido explícito del usuario con foto real de
+  // una prenda propia: "zapatillas de cuero negras y marrones... no son
+  // zapatos, tampoco son mocasines". Hueco real: antes de esta ronda,
+  // CorteCalzado no tenía ningún valor para este archetipo -- ver el
+  // comentario largo en types.ts y CORTES_CUERO_CASUAL en recommend.ts para
+  // el porqué completo. estilo "oficina" PRIMARIO (no secundario como los
+  // mocasines) -- es, ante todo, el calzado de oficina/business-casual real
+  // de hoy, más que un calzado clásico "prestado". secundarios casual/
+  // urbano: funciona igual de bien un fin de semana con jean. suelaContraste
+  // true -- el cupsole blanco/crema es el detalle real de este archetipo
+  // (ver la foto del usuario), a diferencia del zapato de vestir/mocasín de
+  // arriba (suela a tono, cuero de punta a punta).
+  {
+    id: "zapatillas-cuero-negras",
+    nombre: "Zapatillas de cuero negras",
+    categoria: "calzado",
+    colorHex: "#1C1210",
+    textura: "cuero_liso",
+    estilo: "oficina",
+    estilosSecundarios: ["casual", "urbano"],
+    ocasion: "laburo",
+    corteCalzado: "zapatilla_cuero",
+    suelaContraste: true,
+  },
+  {
+    id: "zapatillas-cuero-marrones",
+    nombre: "Zapatillas de cuero marrones",
+    categoria: "calzado",
+    colorHex: "#5C3A21",
+    textura: "cuero_liso",
+    estilo: "oficina",
+    estilosSecundarios: ["casual", "urbano"],
+    ocasion: "laburo",
+    corteCalzado: "zapatilla_cuero",
+    suelaContraste: true,
+  },
   // --- Botines de cuero -- ronda de completitud del catálogo (pedido
   // explícito del usuario: "revisá todas las prendas del catálogo, quiero
   // que me digas si está completo o se puede completar aún más"), revisado

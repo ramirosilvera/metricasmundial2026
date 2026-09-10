@@ -151,6 +151,26 @@ export type Manga = "corta" | "larga" | "sin_mangas";
  *    vestir/oxford real.
  *  - "mocasin" (clasico): SIN cordones (la ausencia es el dato real más
  *    definitorio) + tira/correa cruzando el empeine (penny loafer).
+ *  - "zapatilla_cuero" (oficina): sneaker de cuero minimalista (tipo Common
+ *    Projects/Koio) -- pedido explícito del usuario, con foto real de una
+ *    prenda propia: "zapatillas de cuero negras y marrones... no son
+ *    zapatos, tampoco son mocasines". Revisado como asesor de imagen/
+ *    sastre: es un corte real y hoy mayoritario en placares de oficina
+ *    "business casual", pero NO es lo mismo que zapato_vestir/mocasin (SÍ
+ *    lleva cordones visibles, a diferencia del mocasín, y NO lleva
+ *    broguing/costura de vestir, a diferencia del zapato de vestir) ni que
+ *    zapatilla_urbana (sin las 3 rayas de calle -- la seña real de este
+ *    corte es, al revés, la AUSENCIA casi total de decoración: cuero liso
+ *    sin costuras marcadas, como mucho una pestaña de cuero de contraste en
+ *    el talón). Por eso cuenta como cuero real (ver prendaDeCuero en
+ *    recommend.ts, igual que zapato_vestir/mocasin) y alcanza rango de
+ *    oficina/clásico sin techo (ver rangoDeFormalidad) -- pero, a
+ *    diferencia de esos dos, queda excluido a propósito del registro
+ *    "formal" (ver outfitSirveParaEstilo): un sneaker de cuero, por prolijo
+ *    que sea, no se usa con un traje. Tampoco reemplaza al mocasín para
+ *    sugerenciaDeCorteCalzado -- son cortes DISTINTOS con registros
+ *    parcialmente distintos, así que tener uno no tapa el hueco de no tener
+ *    el otro.
  *  - "zapatilla_lona" (casual): puntera de goma de un tono distinto al
  *    cuerpo (blanco/crema, sin importar el color de la lona) + costura
  *    lateral marcada -- el detalle real de una zapatilla de lona tipo
@@ -179,7 +199,7 @@ export type Manga = "corta" | "larga" | "sin_mangas";
  *    (incluido el botín, que es justo lo opuesto) cubrían frío/entretiempo
  *    pero no el calzado real de un verano de calle -- un guardarropa real
  *    no usa zapatilla cerrada con bermuda en pleno enero. */
-export type CorteCalzado = "zapatilla_urbana" | "zapatilla_running" | "zapato_vestir" | "mocasin" | "zapatilla_lona" | "botin" | "sandalia";
+export type CorteCalzado = "zapatilla_urbana" | "zapatilla_running" | "zapato_vestir" | "mocasin" | "zapatilla_cuero" | "zapatilla_lona" | "botin" | "sandalia";
 
 /** Calce/silueta real de la prenda -- auditoría de sastrería (Consejo,
  *  ronda de auditoría del motor): tercer eje de un conjunto, después del
@@ -510,6 +530,9 @@ export function descripcionPrenda(p: Prenda): string {
     if (p.corte_calzado === "zapatilla_running") return "Zapatillas running";
     if (p.corte_calzado === "zapato_vestir") return "Zapatos de vestir";
     if (p.corte_calzado === "mocasin") return "Mocasines";
+    // zapatilla_cuero -- ver CorteCalzado arriba, pedido explícito del
+    // usuario con foto real de una prenda propia.
+    if (p.corte_calzado === "zapatilla_cuero") return "Zapatillas de cuero";
     if (p.corte_calzado === "zapatilla_lona") return "Zapatillas de lona";
     if (p.corte_calzado === "botin") return "Botines";
     // sandalia -- ver CorteCalzado en types.ts, ronda de completitud del

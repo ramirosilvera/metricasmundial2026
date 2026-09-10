@@ -1101,6 +1101,19 @@ function DecoracionCalzado({
       // ver más abajo dónde se omiten las 2 líneas de cordón para este
       // corte.
       return <rect x={mirror ? 64 : 48} y="227" width="8" height="3.2" rx="1" fill={tono} stroke={stroke} strokeWidth={0.4} />;
+    case "zapatilla_cuero":
+      // sneaker de cuero minimalista -- mismo detalle real que
+      // PrendaIcon.tsx: sin broguing/tira/3 rayas/panel de malla, la seña
+      // es la ausencia de decoración salvo una pestaña de cuero de
+      // contraste en el talón (ver CorteCalzado en types.ts).
+      return (
+        <path
+          d={`M${mx(49.5)} 225.5 Q${mx(52.5)} 221.5 ${mx(55)} 224 L${mx(54)} 229.5 Q${mx(51.5)} 227.5 ${mx(49.5)} 229.5 Z`}
+          fill={tono}
+          stroke={stroke}
+          strokeWidth={0.5}
+        />
+      );
     case "zapatilla_lona":
       // puntera de goma (tono fijo blanco/crema, otro material -- mismo
       // criterio que la suela de contraste) + costura lateral marcada.
