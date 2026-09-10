@@ -69,13 +69,42 @@ describe("precios -- cobertura e integridad de la tabla", () => {
 });
 
 describe("rangoPrecioTexto", () => {
-  it("arma un texto legible con el piso de tercera marca y el techo de primera marca", () => {
+  // Pedido explícito de seguimiento del usuario: "cambialo de pesos a
+  // dólares, porque quiero darle estabilidad frente a la inflación de
+  // pesos Argentina. Así no hay que estar actualizando los listados de
+  // precios constantemente." Ver el comentario "MONEDA" en precios.ts.
+  it("arma un texto en dólares (no en pesos) con el piso de tercera marca y el techo de primera marca", () => {
     const texto = rangoPrecioTexto("calzado");
     expect(texto).toContain("Argentina");
-    expect(texto).toMatch(/\$\d[\d.]*–\$\d[\d.]*/);
+    expect(texto).toMatch(/US\$\d[\d.]*–US\$\d[\d.]*/);
+    expect(texto).not.toContain(".000"); // no debe quedar formato de pesos
   });
 
   it("nunca muestra el mismo texto para dos categorías con rangos distintos (accesorio vs. saco)", () => {
     expect(rangoPrecioTexto("accesorio")).not.toBe(rangoPrecioTexto("saco"));
+  });
+});
+
+describe("rangoPrecio -- conversión a dólares", () => {
+  // Ancla real de la investigación: jean Levi's Argentina $135.000-$198.000
+  // ARS (ver el comentario de TABLA_PRECIOS_ARS) -- a la tasa declarada
+  // (1 USD ≈ $1.500 ARS), eso da un rango de US$90-US$132, coherente con la
+  // propia fuente citada en precios.ts ("un jean Levi's básico... entre 110
+  // y 130 dólares"). Este test fija ese número: si alguien cambia la tasa
+  // o la tabla en pesos sin querer, esto lo detecta.
+  it("convierte de pesos a dólares con la tasa declarada (~1500 ARS/USD)", () => {
+    const r = rangoPrecio("pantalon", "primera_marca");
+    expect(r.min).toBe(90);
+    expect(r.max).toBe(132);
+  });
+
+  it("nunca devuelve decimales -- redondeado al dólar entero", () => {
+    for (const categoria of TODAS_LAS_CATEGORIAS) {
+      for (const nivel of NIVELES) {
+        const r = rangoPrecio(categoria, nivel);
+        expect(Number.isInteger(r.min)).toBe(true);
+        expect(Number.isInteger(r.max)).toBe(true);
+      }
+    }
   });
 });

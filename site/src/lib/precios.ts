@@ -23,6 +23,33 @@ import type { Categoria } from "./types";
  * integración real con una API de precios) un precio exacto de un SKU
  * puntual acá. Fecha de esta investigación: septiembre 2026.
  *
+ * MONEDA -- pedido explícito de seguimiento del usuario: "cambialo de pesos
+ * a dólares, porque quiero darle estabilidad frente a la inflación de
+ * pesos Argentina. Así no hay que estar actualizando los listados de
+ * precios constantemente." Diagnóstico correcto: la investigación original
+ * (HECHO/INFERENCIA de acá abajo) quedó en pesos, y el peso argentino
+ * pierde valor real muy rápido (inflación anual históricamente de dos o
+ * tres dígitos) -- una tabla en ARS se desactualiza en cuestión de meses,
+ * mientras que el dólar es, comparativamente, una moneda estable. Por eso
+ * la investigación de precios (`TABLA_PRECIOS_ARS`, con sus fuentes y su
+ * distinción HECHO/INFERENCIA) se deja intacta como la evidencia real de
+ * cuánto cuesta la ropa en la Argentina -- lo único que cambia es la
+ * MONEDA DE VISUALIZACIÓN, vía un único tipo de cambio (`TASA_ARS_POR_USD`
+ * de acá abajo). Esto cumple el objetivo real del pedido ("no actualizar
+ * constantemente"): si la inflación sigue erosionando el peso, alcanza con
+ * revisar UNA sola constante (la tasa) en vez de rehacer la investigación
+ * de las 11 categorías × 3 niveles de marca desde cero.
+ *
+ * Tasa usada: 1 USD ≈ $1.500 ARS (promedio entre dólar oficial, Banco
+ * Nación, $1.480-$1.530 compra/venta, y dólar blue, $1.520-$1.545 --
+ * brecha de solo ~3%, prácticamente unificados desde la salida del cepo
+ * cambiario en abril de 2025). Fuentes (WebSearch, 9 de septiembre de
+ * 2026): Página|12 ("Dólar blue, dólar hoy", ediciones del 2 y 4 de
+ * septiembre de 2026) y El Cronista ("Dólar blue: cómo cerró su
+ * cotización", 8-9 de septiembre de 2026). Con la brecha oficial/blue tan
+ * chica no hace falta elegir entre las dos cotizaciones -- cualquiera de
+ * las dos da un resultado casi idéntico.
+ *
  * Tres niveles de marca, en las palabras del propio usuario:
  * - "tercera marca": lo más económico -- Shein y equivalentes (indumentaria
  *   importada de bajo costo, sin marca reconocida).
@@ -43,7 +70,10 @@ import type { Categoria } from "./types";
  * INFERENCIA (categoría sin dato directo, estimada por analogía con una
  * categoría hermana ya sourceada, usando el mismo multiplicador
  * tercera->segunda->primera ya confirmado con datos reales) -- nunca se
- * inventa un número sin ese criterio explícito detrás.
+ * inventa un número sin ese criterio explícito detrás. Estas dos etiquetas
+ * describen la INVESTIGACIÓN (en pesos, la moneda en la que de verdad se
+ * cobra la ropa), no la conversión a dólares -- la tasa de cambio en sí
+ * es un HECHO verificado aparte (ver fuentes arriba).
  */
 export type NivelMarca = "tercera_marca" | "segunda_marca" | "primera_marca";
 
@@ -53,10 +83,30 @@ export const NIVEL_MARCA_LABEL: Record<NivelMarca, string> = {
   primera_marca: "Primera marca (Nike/Zara/Levi's, tienda oficial)",
 };
 
-export interface RangoPrecioARS {
+/** Shape interno de la investigación en pesos (TABLA_PRECIOS_ARS) -- no
+ *  exportado, ningún consumidor de este módulo trabaja en pesos (ver el
+ *  comentario "MONEDA" arriba: todo lo que sale de acá es en dólares). */
+interface RangoPrecioARS {
   min: number;
   max: number;
 }
+
+/** Rango de precio en dólares -- lo que devuelve `rangoPrecio()` (la moneda
+ *  de visualización, ver el comentario "MONEDA" de arriba). Mismo shape que
+ *  RangoPrecioARS a propósito (min/max) -- lo único que cambia es la
+ *  moneda, no la forma de los datos. */
+export interface RangoPrecioUSD {
+  min: number;
+  max: number;
+}
+
+/** Ver el comentario "MONEDA" de arriba: 1 USD ≈ $1.500 ARS, promedio
+ *  oficial/blue post-unificación cambiaria (septiembre 2026). Única
+ *  constante a revisar si el tipo de cambio real se mueve mucho -- no hace
+ *  falta rehacer la investigación de precios en pesos (TABLA_PRECIOS_ARS),
+ *  que describe lo que la ropa cuesta en el mercado argentino
+ *  independientemente de qué tan fuerte o débil esté el peso ese día. */
+const TASA_ARS_POR_USD = 1500;
 
 type TablaPrecios = Record<Categoria, Record<NivelMarca, RangoPrecioARS>>;
 
@@ -93,8 +143,13 @@ type TablaPrecios = Record<Categoria, Record<NivelMarca, RangoPrecioARS>>;
  *  mismo multiplicador tercera/segunda/primera ya confirmado (~1.5-2x
  *  entre escalones, ~4x de punta a punta) sobre la categoría hermana más
  *  cercana (bermuda ~0.6x pantalón, short_deportivo similar a remera
- *  deportiva, sweater similar a buzo). Nunca una cifra sin ese criterio. */
-const TABLA_PRECIOS: TablaPrecios = {
+ *  deportiva, sweater similar a buzo). Nunca una cifra sin ese criterio.
+ *
+ *  Se mantiene en PESOS a propósito (ver el comentario "MONEDA" al principio
+ *  del archivo) -- es la moneda real en la que se investigó y en la que de
+ *  verdad se cobra la ropa en Argentina; `rangoPrecio()` la convierte a
+ *  dólares para mostrar, vía TASA_ARS_POR_USD. */
+const TABLA_PRECIOS_ARS: TablaPrecios = {
   remera: {
     tercera_marca: { min: 8000, max: 12000 },
     segunda_marca: { min: 15000, max: 28000 },
@@ -170,19 +225,22 @@ const TABLA_PRECIOS: TablaPrecios = {
   },
 };
 
-/** Rango de precio orientativo en ARS para una categoría y nivel de marca.
- *  Ver el comentario largo de TABLA_PRECIOS sobre método y limitaciones --
- *  nunca un precio puntual de un producto real, siempre un rango. */
-export function rangoPrecio(categoria: Categoria, nivelMarca: NivelMarca): RangoPrecioARS {
-  return TABLA_PRECIOS[categoria][nivelMarca];
+/** Rango de precio en dólares (moneda de visualización, ver el comentario
+ *  "MONEDA" arriba) para una categoría y nivel de marca -- la investigación
+ *  real está en pesos (TABLA_PRECIOS_ARS), convertida acá vía
+ *  TASA_ARS_POR_USD. Redondeado al dólar entero: son rangos orientativos,
+ *  no cifras exactas de un producto puntual, así que más decimales serían
+ *  falsa precisión. */
+export function rangoPrecio(categoria: Categoria, nivelMarca: NivelMarca): RangoPrecioUSD {
+  const enPesos = TABLA_PRECIOS_ARS[categoria][nivelMarca];
+  return {
+    min: Math.round(enPesos.min / TASA_ARS_POR_USD),
+    max: Math.round(enPesos.max / TASA_ARS_POR_USD),
+  };
 }
 
-function formatearARS(n: number): string {
-  // Redondeado al millar -- son rangos orientativos, no cifras exactas de
-  // un producto puntual, así que mostrar los últimos 3 dígitos sería falsa
-  // precisión. Separador de miles "." (convención argentina).
-  const miles = Math.round(n / 1000);
-  return `$${miles.toLocaleString("es-AR")}.000`;
+function formatearUSD(n: number): string {
+  return `US$${n.toLocaleString("es-AR")}`;
 }
 
 /** Texto listo para mostrar en una tarjeta de recomendación de compra: el
@@ -191,9 +249,16 @@ function formatearARS(n: number): string {
  *  niveles, no un solo precio inventado. Un recomendación de compra sin
  *  ninguna referencia de plata (el hallazgo original de esta ronda) no
  *  ayuda a decidir; mostrar los 3 pisos de precio sí, sin fingir saber
- *  cuál de los tres va a elegir el usuario. */
+ *  cuál de los tres va a elegir el usuario.
+ *
+ *  En dólares (ver el comentario "MONEDA" arriba) -- pedido explícito de
+ *  seguimiento del usuario, "para darle estabilidad frente a la inflación
+ *  de pesos". "en Argentina" se mantiene en el texto a propósito: el
+ *  precio sigue siendo el de comprar ropa EN el mercado argentino (con sus
+ *  aranceles de importación reales), solo que expresado en una moneda que
+ *  no se devalúa al mismo ritmo que el peso -- no es un precio de EE.UU. */
 export function rangoPrecioTexto(categoria: Categoria): string {
   const tercera = rangoPrecio(categoria, "tercera_marca");
   const primera = rangoPrecio(categoria, "primera_marca");
-  return `Aprox. ${formatearARS(tercera.min)}–${formatearARS(primera.max)} en Argentina (de tercera a primera marca)`;
+  return `Aprox. ${formatearUSD(tercera.min)}–${formatearUSD(primera.max)} en Argentina (de tercera a primera marca)`;
 }
