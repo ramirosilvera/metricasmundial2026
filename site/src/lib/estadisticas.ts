@@ -6,9 +6,11 @@ import {
   estilosDe,
   sugerenciaDeAbrigoEntretiempo,
   sugerenciaDeAbrigoInvierno,
+  sugerenciaDeAccesorio,
   sugerenciaDeAncla,
   sugerenciaDeAnclaInvernal,
   sugerenciaDeCalzado,
+  sugerenciaDeCorteCalzado,
   sugerenciaDeSacoDeVerano,
   sugerenciaDeVariedad,
 } from "./recommend";
@@ -329,9 +331,18 @@ function diagnosticoGeneral(
  *  4. saco de verano (solo "formal") -- cero outfits formales con calor real.
  *  5. variedad de torso/color -- no bloquea una estación entera, pero limita
  *     cuántas combinaciones distintas arma con lo que hay.
- *  6. variedad de calzado -- el hueco más cosmético: todo outfit posible
- *     termina en el mismo par. */
-export type TierHueco = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+ *  6. variedad de calzado (cantidad) -- todo outfit posible termina en el
+ *     mismo par.
+ *  7. variedad de CORTE de calzado -- auditoría de Consejo (roles: asesor de
+ *     imagen/sastre), pedido explícito del usuario: "no solo te bases en el
+ *     color sino tmb en el tipo y estilo de prendas". Hay 2+ pares (el punto
+ *     6 no aplica) pero todos el mismo corte_calzado (zapatilla_urbana,
+ *     zapato_vestir, etc.) -- ver sugerenciaDeCorteCalzado en recommend.ts.
+ *  8. variedad de POSICIÓN de accesorio -- mismo hallazgo para "accesorio":
+ *     cinturón/corbata/bufanda/gorro son tipos de prenda distintos bajo una
+ *     sola categoría, invisibles para categoriasAusentes -- ver
+ *     sugerenciaDeAccesorio en recommend.ts. */
+export type TierHueco = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface HuecoDeCompra {
   tier: TierHueco;
@@ -356,7 +367,7 @@ export interface CompraPrioritaria {
  *  estación de hoy?". Por eso acá SIEMPRE se chequean las dos estaciones
  *  (invierno y entretiempo) y no una sola: un hueco de abrigo de invierno es
  *  real y accionable en pleno verano, aunque hoy no se note. `null` solo si
- *  de verdad no hay ningún hueco en ninguna de las 7 capas para este
+ *  de verdad no hay ningún hueco en ninguna de las 9 capas para este
  *  estilo. */
 function huecoDeEstilo(estilo: Estilo, placard: Prenda[], catalogo: (PresetPrenda & { hsl: HSL })[]): HuecoDeCompra | null {
   const ancla = sugerenciaDeAncla(estilo, placard, catalogo);
@@ -381,6 +392,12 @@ function huecoDeEstilo(estilo: Estilo, placard: Prenda[], catalogo: (PresetPrend
 
   const calzado = sugerenciaDeCalzado(estilo, placard, catalogo);
   if (calzado) return { tier: 6, estilo, ...calzado };
+
+  const corteCalzado = sugerenciaDeCorteCalzado(estilo, placard, catalogo);
+  if (corteCalzado) return { tier: 7, estilo, ...corteCalzado };
+
+  const accesorio = sugerenciaDeAccesorio(estilo, placard, catalogo);
+  if (accesorio) return { tier: 8, estilo, ...accesorio };
 
   return null;
 }

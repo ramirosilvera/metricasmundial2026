@@ -27,10 +27,12 @@ import {
   semillaDelDia,
   sugerenciaDeAbrigoEntretiempo,
   sugerenciaDeAbrigoInvierno,
+  sugerenciaDeAccesorio,
   sugerenciaDeAncla,
   sugerenciaDeAnclaInvernal,
   sugerenciaDeSacoDeVerano,
   sugerenciaDeCalzado,
+  sugerenciaDeCorteCalzado,
   sugerenciaDeVariedad,
   tanda,
   tecnicaRescate,
@@ -3269,6 +3271,160 @@ describe("sugerenciaDeVariedad", () => {
   });
 });
 
+// Consejo, ronda siguiente -- pedido explícito del usuario: "revisa el motor
+// y la UI de recomendación de compras, no solo te bases en el color sino
+// tmb en el tipo y estilo de prendas". Hallazgo real, verificado contra el
+// placard real del usuario vía Supabase (68 prendas, las 11 categorías
+// cubiertas): sugerenciaDeCalzado (arriba) solo CUENTA pares -- con 7-8
+// pares cargados pero todos zapatilla_urbana/running/zapato_vestir (cero
+// mocasín/botín/sandalia), esa capa ya ve "2+ pares" y calla. Esta función
+// mira el corte_calzado real, no solo la cantidad.
+describe("sugerenciaDeCorteCalzado", () => {
+  function mkConEstilo(categoria: Prenda["categoria"], hex: string, h: number, s: number, l: number, estilo: Prenda["estilo"]): Prenda {
+    const p = mkPrenda(categoria, hex, h, s, l);
+    p.estilo = estilo;
+    return p;
+  }
+
+  const catalogoFormal: (PresetPrenda & { hsl: HSL })[] = [
+    { id: "zapato-vestir-negro", nombre: "Zapato de vestir negro", categoria: "calzado", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "formal", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "zapato_vestir" },
+    { id: "zapato-vestir-marron", nombre: "Zapato de vestir marrón", categoria: "calzado", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "formal", hsl: { h: 25, s: 47, l: 25 }, corteCalzado: "zapato_vestir" },
+    { id: "mocasin-negro", nombre: "Mocasín negro", categoria: "calzado", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "formal", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "mocasin" },
+    // otro estilo -- nunca debería ofrecerse para "formal".
+    { id: "sandalia-casual", nombre: "Sandalia casual", categoria: "calzado", colorHex: "#5C3A21", textura: "cuero_liso", estilo: "casual", hsl: { h: 25, s: 47, l: 25 }, corteCalzado: "sandalia" },
+  ];
+
+  it("sin ancla -> null", () => {
+    expect(sugerenciaDeCorteCalzado("formal", [], catalogoFormal)).toBeNull();
+  });
+
+  it("0 calzados de ese estilo -> null (ese hueco más grande lo cubre sugerenciaDeCalzado, no esta capa)", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    expect(sugerenciaDeCorteCalzado("formal", [pantalon], catalogoFormal)).toBeNull();
+  });
+
+  it("2+ pares, todos el MISMO corte -- sugiere el corte que falta, aunque la cantidad ya esté cubierta", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const zapatoNegro = mkConEstilo("calzado", "#1A1A1A", 0, 0, 10, "formal");
+    zapatoNegro.corte_calzado = "zapato_vestir";
+    zapatoNegro.textura = "cuero_liso";
+    const zapatoMarron = mkConEstilo("calzado", "#5C3A21", 25, 47, 25, "formal");
+    zapatoMarron.corte_calzado = "zapato_vestir";
+    zapatoMarron.textura = "cuero_liso";
+    zapatoMarron.id = "zapato-marron-placard"; // mismo hex+categoria que otro test -- evita colisión de id
+
+    const r = sugerenciaDeCorteCalzado("formal", [pantalon, zapatoNegro, zapatoMarron], catalogoFormal);
+    expect(r).not.toBeNull();
+    expect(r!.sugerida.id).toBe("mocasin-negro");
+    expect(r!.mensaje).toContain("mismo corte");
+    expect(r!.mensaje).toContain("mocasín");
+  });
+
+  it("ya tiene variedad real de corte (zapato de vestir Y mocasín) -> null", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const zapatoNegro = mkConEstilo("calzado", "#1A1A1A", 0, 0, 10, "formal");
+    zapatoNegro.corte_calzado = "zapato_vestir";
+    zapatoNegro.textura = "cuero_liso";
+    zapatoNegro.id = "zapato-negro-variedad";
+    const mocasin = mkConEstilo("calzado", "#1A1A1A", 0, 0, 10, "formal");
+    mocasin.corte_calzado = "mocasin";
+    mocasin.textura = "cuero_liso";
+    mocasin.id = "mocasin-negro-variedad";
+
+    expect(sugerenciaDeCorteCalzado("formal", [pantalon, zapatoNegro, mocasin], catalogoFormal)).toBeNull();
+  });
+
+  it("nunca sugiere un corte que el catálogo no ofrece para ESE estilo (la sandalia es 'casual', no 'formal')", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const zapatoNegro = mkConEstilo("calzado", "#1A1A1A", 0, 0, 10, "formal");
+    zapatoNegro.corte_calzado = "zapato_vestir";
+    zapatoNegro.textura = "cuero_liso";
+    const zapatoMarron = mkConEstilo("calzado", "#5C3A21", 25, 47, 25, "formal");
+    zapatoMarron.corte_calzado = "zapato_vestir";
+    zapatoMarron.textura = "cuero_liso";
+    zapatoMarron.id = "zapato-marron-sin-sandalia";
+
+    const catalogoSinMocasin = catalogoFormal.filter((p) => p.id !== "mocasin-negro");
+    const r = sugerenciaDeCorteCalzado("formal", [pantalon, zapatoNegro, zapatoMarron], catalogoSinMocasin);
+    expect(r).toBeNull(); // el único corte "nuevo" del catálogo (sandalia) no es de estilo formal
+  });
+});
+
+// Contraparte para "accesorio" -- mismo hallazgo real: cinturón (posicion
+// "cintura"), corbata/bufanda ("cuello") y gorro/gorra ("cabeza") son tres
+// tipos de prenda funcionalmente distintos bajo una sola categoría.
+// Verificado contra el placard real: 2 cinturones + 1 corbata cargados,
+// cero bufanda/gorro -- "accesorio" nunca aparece en categoriasAusentes
+// (no está vacía), así que ninguna capa anterior podía ver este hueco.
+describe("sugerenciaDeAccesorio", () => {
+  function mkConEstilo(categoria: Prenda["categoria"], hex: string, h: number, s: number, l: number, estilo: Prenda["estilo"]): Prenda {
+    const p = mkPrenda(categoria, hex, h, s, l);
+    p.estilo = estilo;
+    return p;
+  }
+
+  const catalogoFormal: (PresetPrenda & { hsl: HSL })[] = [
+    { id: "cinturon-negro", nombre: "Cinturón negro", categoria: "accesorio", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "clasico", estilosSecundarios: ["formal"], hsl: { h: 0, s: 0, l: 10 }, posicionAccesorio: "cintura" },
+    { id: "corbata-negra", nombre: "Corbata negra", categoria: "accesorio", colorHex: "#1A1A1A", textura: "seda", estilo: "formal", requiereCuello: true, hsl: { h: 0, s: 0, l: 10 }, posicionAccesorio: "cuello" },
+    // otro estilo -- nunca debería ofrecerse para "formal" (no hay gorra de traje).
+    { id: "gorra-negra", nombre: "Gorra negra", categoria: "accesorio", colorHex: "#1A1A1A", textura: "algodon", estilo: "urbano", hsl: { h: 0, s: 0, l: 10 }, posicionAccesorio: "cabeza" },
+  ];
+
+  it("sin ancla -> null", () => {
+    expect(sugerenciaDeAccesorio("formal", [], catalogoFormal)).toBeNull();
+  });
+
+  it("0 accesorios de ese estilo -> sugiere el primero disponible (prioridad cuello), mensaje de 'ningún accesorio'", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const r = sugerenciaDeAccesorio("formal", [pantalon], catalogoFormal);
+    expect(r).not.toBeNull();
+    expect(r!.sugerida.id).toBe("corbata-negra"); // cuello antes que cintura
+    expect(r!.mensaje).toContain("ningún accesorio");
+  });
+
+  it("solo cinturón (posicion cintura) -- catálogo ofrece corbata (cuello) para formal -> la sugiere, prioridad cuello", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const cinturon = mkConEstilo("accesorio", "#1A1A1A", 0, 0, 10, "formal");
+    cinturon.posicion_accesorio = "cintura";
+    cinturon.textura = "cuero_liso";
+
+    const r = sugerenciaDeAccesorio("formal", [pantalon, cinturon], catalogoFormal);
+    expect(r).not.toBeNull();
+    expect(r!.sugerida.id).toBe("corbata-negra");
+    expect(r!.mensaje).toContain("cuello");
+  });
+
+  it("ya tiene cinturón Y corbata (las dos posiciones que el catálogo ofrece para formal) -> null", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const cinturon = mkConEstilo("accesorio", "#1A1A1A", 0, 0, 10, "formal");
+    cinturon.posicion_accesorio = "cintura";
+    cinturon.textura = "cuero_liso";
+    cinturon.id = "cinturon-placard";
+    const corbata = mkConEstilo("accesorio", "#1A1A1A", 0, 0, 10, "formal");
+    corbata.posicion_accesorio = "cuello";
+    corbata.requiere_cuello = true;
+    corbata.textura = "seda";
+    corbata.id = "corbata-placard";
+
+    expect(sugerenciaDeAccesorio("formal", [pantalon, cinturon, corbata], catalogoFormal)).toBeNull();
+  });
+
+  it("nunca sugiere una posición que el catálogo no ofrece para ESE estilo (la gorra es 'urbano', no 'formal')", () => {
+    const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "formal");
+    const cinturon = mkConEstilo("accesorio", "#1A1A1A", 0, 0, 10, "formal");
+    cinturon.posicion_accesorio = "cintura";
+    cinturon.textura = "cuero_liso";
+    const corbata = mkConEstilo("accesorio", "#1A1A1A", 0, 0, 10, "formal");
+    corbata.posicion_accesorio = "cuello";
+    corbata.requiere_cuello = true;
+    corbata.textura = "seda";
+    corbata.id = "corbata-sin-gorra";
+
+    const r = sugerenciaDeAccesorio("formal", [pantalon, cinturon, corbata], catalogoFormal);
+    expect(r).toBeNull(); // "cabeza" (gorra) no es una posición que el catálogo ofrezca para formal
+  });
+});
+
 describe("sugerenciaDeAncla", () => {
   const catalogoClasico: (PresetPrenda & { hsl: HSL })[] = [
     { id: "pantalon-clasico-negro", nombre: "Pantalón clásico negro", categoria: "pantalon", colorHex: "#1A1A1A", estilo: "clasico", hsl: { h: 0, s: 0, l: 10 } },
@@ -3756,7 +3912,11 @@ describe("auditoriaDeGuardarropa", () => {
     expect(r!.mensaje).toContain("un solo calzado");
   });
 
-  it("placard bien cubierto en las 5 capas -> null, sin ningún hueco real", () => {
+  // catalogoCompleto no ofrece más de un corte_calzado ni ningún accesorio
+  // para "clasico" -- las capas 7/8 (sugerenciaDeCorteCalzado/
+  // sugerenciaDeAccesorio) corren igual acá, pero sin nada nuevo que el
+  // catálogo pueda ofrecer siguen devolviendo null, como el resto.
+  it("placard bien cubierto en las 7 capas que aplican acá -> null, sin ningún hueco real", () => {
     const pantalon = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10);
     pantalon.estilo = "clasico";
     const sweaterInvierno = mkPrenda("sweater", "#1A1A1A", 0, 0, 10);
@@ -3779,6 +3939,47 @@ describe("auditoriaDeGuardarropa", () => {
         catalogoCompleto,
       ),
     ).toBeNull();
+  });
+
+  // Consejo, ronda siguiente -- pedido explícito del usuario: "revisa el
+  // motor y la UI de recomendación de compras, no solo te bases en el color
+  // sino tmb en el tipo y estilo de prendas". Verifica que, con las 6 capas
+  // anteriores ya resueltas, la cadena SIGUE bajando hasta la 7
+  // (sugerenciaDeCorteCalzado) en vez de devolver null antes de tiempo --
+  // el caso real encontrado auditando el placard del usuario: ancla, abrigo,
+  // variedad de torso/color y CANTIDAD de calzado ya estaban perfectos, pero
+  // los 2 pares de calzado eran del mismo corte.
+  it("6 capas resueltas pero calzado del mismo corte -> cae en la capa 7 (sugerenciaDeCorteCalzado)", () => {
+    const catalogoConMocasin: (PresetPrenda & { hsl: HSL })[] = [
+      ...catalogoCompleto,
+      { id: "mocasin-clasico-negro", nombre: "Mocasín clásico negro", categoria: "calzado", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "clasico", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "mocasin" },
+    ];
+    const pantalon = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10);
+    pantalon.estilo = "clasico";
+    const sweaterInvierno = mkPrenda("sweater", "#1A1A1A", 0, 0, 10);
+    sweaterInvierno.estilo = "clasico";
+    sweaterInvierno.estacion = "invierno";
+    const sweaterEntretiempo = mkPrenda("sweater", "#8C8C8C", 0, 0, 55);
+    sweaterEntretiempo.estilo = "clasico";
+    sweaterEntretiempo.estacion = "entretiempo";
+    const remeraBlanca = mkPrenda("remera", "#FFFFFF", 0, 0, 100);
+    remeraBlanca.estilo = "clasico";
+    const calzadoNegro = mkPrenda("calzado", "#1A1A1A", 0, 0, 10);
+    calzadoNegro.estilo = "clasico";
+    calzadoNegro.corte_calzado = "zapatilla_urbana";
+    const calzadoMarron = mkPrenda("calzado", "#5C3A21", 25, 44, 25);
+    calzadoMarron.estilo = "clasico";
+    calzadoMarron.corte_calzado = "zapatilla_urbana"; // mismo corte que el negro -- el hueco real
+
+    const r = auditoriaDeGuardarropa(
+      "clasico",
+      [pantalon, sweaterInvierno, sweaterEntretiempo, remeraBlanca, calzadoNegro, calzadoMarron],
+      undefined,
+      catalogoConMocasin,
+    );
+    expect(r).not.toBeNull();
+    expect(r!.sugerida.id).toBe("mocasin-clasico-negro");
+    expect(r!.mensaje).toContain("mismo corte");
   });
 });
 

@@ -3233,6 +3233,18 @@ function mejorCandidatoDelCatalogo(
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[],
   soloEstacion?: "invierno" | "entretiempo",
+  // Auditoría de Consejo (roles: asesor de imagen/estilista + arquitecto del
+  // motor), pedido explícito del usuario: "revisa el motor y la UI de
+  // recomendación de compras, no solo te bases en el color sino tmb en el
+  // tipo y estilo de prendas". `filtroExtra` es lo que permite pedir "el
+  // mejor candidato de esta categoría, pero además de este SUBTIPO puntual"
+  // -- ver sugerenciaDeCorteCalzado/sugerenciaDeAccesorio más abajo, que lo
+  // usan para pedir un corte_calzado o un posicion_accesorio específico en
+  // vez de cualquiera de la categoría. Sin esto, no había forma de pedirle
+  // al catálogo "un mocasín" o "una corbata" puntual -- solo "cualquier
+  // calzado"/"cualquier accesorio" de ese estilo, sea cual sea su corte o
+  // posición, lo mismo que ya hacía el resto de esta función.
+  filtroExtra?: (preset: PresetPrenda) => boolean,
 ): (PresetPrenda & { hsl: HSL }) | undefined {
   const candidatos = catalogo
     .filter(
@@ -3240,6 +3252,7 @@ function mejorCandidatoDelCatalogo(
         preset.categoria === categoria &&
         estilosDe(presetAPrendaSintetica(preset)).includes(estilo) &&
         (!soloEstacion || preset.estacion === soloEstacion) &&
+        (!filtroExtra || filtroExtra(preset)) &&
         // nunca ofrecer comprar algo que el usuario ya tiene -- ver
         // yaEstaEnElPlacard (bug real reportado sobre la tarjeta de compra
         // prioritaria). Si esto deja la lista vacía, la capa que llamó
@@ -3355,6 +3368,158 @@ export function sugerenciaDeCalzado(
       ? `Para ${ESTILO_LABEL[estilo]} todavía no tenés ningún calzado cargado -- te serviría sumar uno, como este: "${sugerida.nombre}".`
       : `Para ${ESTILO_LABEL[estilo]} tenés un solo calzado -- por más variedad de arriba que sumes, siempre termina en el mismo par. Te serviría sumar otro, como este: "${sugerida.nombre}".`;
   return { mensaje, sugerida };
+}
+
+/** Nombres legibles de CorteCalzado (ver types.ts) para los mensajes de
+ *  sugerenciaDeCorteCalzado -- no existía un mapeo así en ningún lado
+ *  (PrendaForm.tsx arma su propio <select> con el texto del option inline,
+ *  nunca un Record reusable). Orden = el mismo orden en que aparece el tipo
+ *  en types.ts, usado también como prioridad de sugerencia más abajo. */
+const CORTE_CALZADO_LABEL: Record<CorteCalzado, string> = {
+  zapatilla_urbana: "una zapatilla urbana",
+  zapatilla_running: "una zapatilla running",
+  zapato_vestir: "un zapato de vestir",
+  mocasin: "un mocasín",
+  zapatilla_lona: "una zapatilla de lona",
+  botin: "un botín",
+  sandalia: "una sandalia",
+};
+
+/** Auditoría de Consejo (roles: asesor de imagen/estilista + sastre), pedido
+ *  explícito del usuario: "revisa el motor y la UI de recomendación de
+ *  compras, no solo te bases en el color sino tmb en el tipo y estilo de
+ *  prendas". Hallazgo real, verificado por ejecución contra el placard real
+ *  del usuario (68 prendas, las 11 categorías cubiertas): TODA la cadena de
+ *  huecos de compra existente hasta esta ronda (armarOutfitsParaComprar,
+ *  auditoriaDeGuardarropa, compraDeMayorImpacto) mira `categoria` como
+ *  máximo nivel de detalle, y dentro de "calzado" solo CUENTA cuántos pares
+ *  hay (sugerenciaDeCalzado, arriba) -- nunca mira `corte_calzado`. Con 7-8
+ *  pares de calzado real cargados pero TODOS zapatilla_urbana/running/
+ *  zapato_vestir (cero mocasín, botín o sandalia -- exactamente el caso real
+ *  encontrado), `sugerenciaDeCalzado` ya ve "2+ pares" y calla, así que
+ *  ninguna capa del motor detectaba el hueco real: dos zapatos de vestir del
+ *  MISMO tono, comprados de más, mientras un registro clásico entero (que sí
+ *  combina con mocasín) nunca tenía ese corte disponible.
+ *
+ *  Mismo patrón que sugerenciaDeCalzado (que sigue corriendo primero en la
+ *  cadena, ver auditoriaDeGuardarropa -- "0 o 1 calzado" es un bloqueo más
+ *  grande que "falta un corte", así que se revisa antes): 0 calzados de este
+ *  estilo ya lo cubre esa capa, así que acá se exige al menos 1 para no
+ *  duplicar el mismo aviso dos veces. `cortesDisponibles` se calcula desde
+ *  el CATÁLOGO real filtrado por estilo -- nunca se sugiere un corte que el
+ *  catálogo no ofrece para ese registro (ver el comentario de CorteCalzado
+ *  en types.ts: sandalia es casual/verano, no tiene sentido para formal, y
+ *  el catálogo mismo ya refleja esa restricción real sin necesidad de
+ *  hardcodearla acá). Orden de sugerencia = CORTE_CALZADO_LABEL de arriba
+ *  (el mismo orden del tipo en types.ts), determinístico. */
+export function sugerenciaDeCorteCalzado(
+  estilo: Estilo,
+  placard: Prenda[],
+  catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+): SugerenciaVariedad | null {
+  const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
+  const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
+  if (!ancla) return null;
+
+  const calzados = prendasEstilo.filter((p) => p.categoria === "calzado");
+  if (calzados.length === 0) return null; // hueco más grande, ya cubierto por sugerenciaDeCalzado
+
+  const cortesActuales = new Set(calzados.map((c) => c.corte_calzado));
+  const cortesDisponibles = new Set(
+    catalogo
+      .filter((p) => p.categoria === "calzado" && estilosDe(presetAPrendaSintetica(p)).includes(estilo))
+      .map((p) => p.corteCalzado),
+  );
+
+  const coloresActuales = new Set(prendasEstilo.map((p) => nombreColor(p.color_h, p.color_s, p.color_l)));
+  for (const corte of Object.keys(CORTE_CALZADO_LABEL) as CorteCalzado[]) {
+    if (!cortesDisponibles.has(corte) || cortesActuales.has(corte)) continue;
+    const sugerida = mejorCandidatoDelCatalogo(
+      ancla,
+      "calzado",
+      estilo,
+      coloresActuales,
+      placard,
+      catalogo,
+      undefined,
+      (preset) => preset.corteCalzado === corte,
+    );
+    if (!sugerida) continue;
+    return {
+      mensaje: `Para ${ESTILO_LABEL[estilo]} tu calzado es siempre del mismo corte -- te falta ${CORTE_CALZADO_LABEL[corte]}, un tipo que todavía no tenés en ese registro. Te serviría sumar "${sugerida.nombre}".`,
+      sugerida,
+    };
+  }
+  return null;
+}
+
+/** Contraparte de sugerenciaDeCorteCalzado para accesorios -- mismo hallazgo
+ *  real, mismo motivo: "accesorio" cubre cinturón (posicion_accesorio
+ *  "cintura"), corbata/bufanda ("cuello") y gorro/gorra ("cabeza"), tres
+ *  TIPOS de prenda funcionalmente distintos que viven bajo una sola
+ *  categoría -- así que ninguna capa existente los distinguía. Verificado
+ *  contra el placard real: 2 cinturones + 1 corbata cargados (3 accesorios,
+ *  "accesorio" no es una categoría ausente para categoriasAusentes/
+ *  armarOutfitsParaComprar), cero bufanda y cero gorro/gorra -- un hueco
+ *  real e invisible para el motor hasta esta ronda.
+ *
+ *  A diferencia de sugerenciaDeCorteCalzado, acepta 0 accesorios de este
+ *  estilo (no hay una capa previa tipo sugerenciaDeCalzado para accesorio
+ *  que ya cubra ese caso) -- así que también sugiere la primera posición
+ *  disponible cuando el usuario no tiene NINGÚN accesorio de este registro.
+ *  `posicionesDisponibles` sale del catálogo real filtrado por estilo, mismo
+ *  criterio que arriba: nunca se inventa una posición que el catálogo no
+ *  ofrece para ese registro (una gorra no existe en el catálogo para
+ *  "formal", así que nunca se sugiere una ahí -- es el catálogo real el que
+ *  pone el límite, no una regla hardcodeada). Orden de sugerencia: cuello
+ *  (corbata/bufanda, el más distintivo -- cambia el cuello de la prenda de
+ *  torso) primero, cabeza (gorro/gorra) después, cintura (cinturón) al
+ *  final -- el que más usuarios YA tienen cargado en la práctica, así que es
+ *  el menos probable que falte de verdad. */
+const POSICION_ACCESORIO_LABEL: Record<"cuello" | "cabeza" | "cintura", string> = {
+  cuello: "algo para el cuello (corbata o bufanda)",
+  cabeza: "algo para la cabeza (gorro o gorra)",
+  cintura: "un cinturón",
+};
+
+export function sugerenciaDeAccesorio(
+  estilo: Estilo,
+  placard: Prenda[],
+  catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+): SugerenciaVariedad | null {
+  const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
+  const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
+  if (!ancla) return null;
+
+  const accesorios = prendasEstilo.filter((p) => p.categoria === "accesorio");
+  const posicionesActuales = new Set(accesorios.map((a) => a.posicion_accesorio));
+  const posicionesDisponibles = new Set(
+    catalogo
+      .filter((p) => p.categoria === "accesorio" && estilosDe(presetAPrendaSintetica(p)).includes(estilo))
+      .map((p) => p.posicionAccesorio ?? "cintura"),
+  );
+
+  const coloresActuales = new Set(prendasEstilo.map((p) => nombreColor(p.color_h, p.color_s, p.color_l)));
+  for (const posicion of ["cuello", "cabeza", "cintura"] as const) {
+    if (!posicionesDisponibles.has(posicion) || posicionesActuales.has(posicion)) continue;
+    const sugerida = mejorCandidatoDelCatalogo(
+      ancla,
+      "accesorio",
+      estilo,
+      coloresActuales,
+      placard,
+      catalogo,
+      undefined,
+      (preset) => (preset.posicionAccesorio ?? "cintura") === posicion,
+    );
+    if (!sugerida) continue;
+    const mensaje =
+      accesorios.length === 0
+        ? `Para ${ESTILO_LABEL[estilo]} todavía no tenés ningún accesorio cargado -- te serviría sumar uno, como este: "${sugerida.nombre}".`
+        : `Para ${ESTILO_LABEL[estilo]} tus accesorios son siempre del mismo tipo -- te falta ${POSICION_ACCESORIO_LABEL[posicion]}. Te serviría sumar "${sugerida.nombre}".`;
+    return { mensaje, sugerida };
+  }
+  return null;
 }
 
 export interface SugerenciaAncla {
@@ -3697,9 +3862,25 @@ export interface AuditoriaGuardarropa {
  *   5. Variedad de torso y de color (ver sugerenciaDeVariedad) -- ya no
  *      bloquea una estación entera, pero sí limita cuántas combinaciones
  *      distintas arma con lo que hay.
- *   6. Variedad de calzado (ver sugerenciaDeCalzado) -- el hueco más sutil:
- *      por más torsos y colores que haya, si hay un solo par, todo
- *      termina pareciendo la misma combinación.
+ *   6. Variedad de calzado (ver sugerenciaDeCalzado) -- el hueco más sutil
+ *      de CANTIDAD: por más torsos y colores que haya, si hay un solo par,
+ *      todo termina pareciendo la misma combinación.
+ *   7. Variedad de CORTE de calzado (ver sugerenciaDeCorteCalzado) -- auditoría
+ *      de Consejo (roles: asesor de imagen/sastre), pedido explícito del
+ *      usuario: "no solo te bases en el color sino tmb en el tipo y estilo
+ *      de prendas". Distinta del punto 6: acá YA hay 2+ pares (ese hueco no
+ *      aplica), pero todos son el mismo CORTE (zapatilla_urbana, zapato_
+ *      vestir, etc.) -- verificado con el placard real del usuario, que
+ *      tenía 7 pares de calzado sin un solo mocasín/botín/sandalia, un
+ *      hueco de TIPO que ninguna capa anterior podía ver (todas miran
+ *      cantidad o color, nunca corte_calzado).
+ *   8. Variedad de POSICIÓN de accesorio (ver sugerenciaDeAccesorio) --
+ *      mismo hallazgo, para "accesorio": cinturón (cintura), corbata/
+ *      bufanda (cuello) y gorro/gorra (cabeza) son tres tipos de prenda
+ *      distintos que comparten una sola categoría -- verificado con el
+ *      placard real: 2 cinturones + 1 corbata cargados, cero bufanda/
+ *      gorro, un hueco invisible para categoriasAusentes (que solo ve
+ *      "accesorio" como categoría, nunca vacía en este caso).
  *  Devuelve la PRIMERA que encuentre, ya priorizada -- un tip claro y
  *  accionable, no una pared de advertencias. `null` solo si de verdad no
  *  hay ningún hueco real en ninguna de las capas (placard bien cubierto
@@ -3735,7 +3916,13 @@ export function auditoriaDeGuardarropa(
   const variedad = sugerenciaDeVariedad(estilo, placard, catalogo);
   if (variedad) return variedad;
 
-  return sugerenciaDeCalzado(estilo, placard, catalogo);
+  const calzado = sugerenciaDeCalzado(estilo, placard, catalogo);
+  if (calzado) return calzado;
+
+  const corteCalzado = sugerenciaDeCorteCalzado(estilo, placard, catalogo);
+  if (corteCalzado) return corteCalzado;
+
+  return sugerenciaDeAccesorio(estilo, placard, catalogo);
 }
 
 /** Diff entre las prendas actuales de un outfit guardado y las que el
