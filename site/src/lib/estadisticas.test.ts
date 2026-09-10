@@ -443,6 +443,32 @@ describe("compraDeMayorImpacto", () => {
     expect(r!.mensaje).toContain("mismo corte");
   });
 
+  // Consejo, ronda siguiente -- pedido explícito del usuario: "quiero que
+  // se puedan actualizar las recomendaciones de compra... quizás no quiero
+  // comprar esa prenda pero quiero ver qué más sugiere". huecoDeEstilo
+  // duplica la cadena de auditoriaDeGuardarropa (ver recommend.test.ts para
+  // la cobertura completa del mecanismo) -- este test es solo para
+  // confirmar que `excluirIds` llegó también a ESTA cadena espejo.
+  it("excluirIds descarta la sugerencia actual y compraDeMayorImpacto devuelve la siguiente mejor", () => {
+    const catalogoDosMocasines: (PresetPrenda & { hsl: HSL })[] = [
+      { id: "mocasin-casual-negro", nombre: "Mocasín casual negro", categoria: "calzado", colorHex: "#1A1A1A", estilo: "casual", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "mocasin" },
+      { id: "mocasin-casual-marron", nombre: "Mocasín casual marrón", categoria: "calzado", colorHex: "#5C3A21", estilo: "casual", hsl: { h: 25, s: 44, l: 25 }, corteCalzado: "mocasin" },
+    ];
+    const pantalonCasual = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10, "casual");
+    const remera1 = mkPrenda("remera", "#1A1A1A", 0, 0, 10, "casual");
+    const remera2 = mkPrenda("remera", "#FFFFFF", 0, 0, 95, "casual");
+    const zapato1 = mkPrenda("calzado", "#1A1A1A", 0, 0, 10, "casual");
+    const zapato2 = mkPrenda("calzado", "#FFFFFF", 0, 0, 95, "casual");
+    const placard = [pantalonCasual, remera1, remera2, zapato1, zapato2];
+
+    const primero = compraDeMayorImpacto(placard, catalogoDosMocasines);
+    expect(primero).not.toBeNull();
+
+    const segundo = compraDeMayorImpacto(placard, catalogoDosMocasines, new Set([primero!.sugerida.id]));
+    expect(segundo).not.toBeNull();
+    expect(segundo!.sugerida.id).not.toBe(primero!.sugerida.id);
+  });
+
   it("analizarFoda expone la misma recomendación como compraPrioritaria, consistente con sus propias oportunidades", () => {
     const r = analizarFoda([mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")]);
     expect(r.compraPrioritaria).not.toBeNull();
@@ -453,6 +479,20 @@ describe("compraDeMayorImpacto", () => {
 
   it("placard vacío del todo -> analizarFoda no propone compraPrioritaria (sin diagnóstico posible)", () => {
     expect(analizarFoda([]).compraPrioritaria).toBeNull();
+  });
+
+  // Consejo, ronda siguiente -- pedido explícito del usuario: "quiero que
+  // se puedan actualizar las recomendaciones de compra". Acá contra el
+  // catálogo real (CATALOGO_CON_HSL) -- analizarFoda no recibe un catálogo
+  // inyectable -- así que el criterio es "nunca repite la misma sugerida",
+  // no una prenda puntual esperada.
+  it("excluirIds hace que compraPrioritaria nunca repita la sugerencia ya descartada", () => {
+    const placard = [mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")];
+    const primero = analizarFoda(placard).compraPrioritaria;
+    expect(primero).not.toBeNull();
+
+    const segundo = analizarFoda(placard, new Set([primero!.sugerida.id])).compraPrioritaria;
+    expect(segundo?.sugerida.id).not.toBe(primero!.sugerida.id);
   });
 });
 

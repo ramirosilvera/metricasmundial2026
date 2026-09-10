@@ -3981,6 +3981,58 @@ describe("auditoriaDeGuardarropa", () => {
     expect(r!.sugerida.id).toBe("mocasin-clasico-negro");
     expect(r!.mensaje).toContain("mismo corte");
   });
+
+  // Consejo, ronda siguiente -- pedido explícito del usuario: "quiero que
+  // se puedan actualizar las recomendaciones de compra. Porque siempre
+  // arroja la misma opción hasta que compres la prenda recomendada. Y
+  // quizás no quiero comprar esa prenda pero quiero ver qué más sugiere."
+  describe("excluirIds -- 'Ver otra opción' sin tener que comprar la sugerida", () => {
+    it("con un solo candidato posible en el catálogo, excluirlo hace que la auditoría no tenga nada más que ofrecer (null, no un error)", () => {
+      const r = auditoriaDeGuardarropa("clasico", [], undefined, catalogoCompleto, new Set(["pantalon-clasico-negro"]));
+      expect(r).toBeNull();
+    });
+
+    it("con 2+ candidatos reales, descartar el mejor hace que devuelva el SIGUIENTE mejor -- nunca el mismo dos veces", () => {
+      const catalogoDosPantalones: (PresetPrenda & { hsl: HSL })[] = [
+        ...catalogoCompleto,
+        { id: "pantalon-clasico-beige", nombre: "Pantalón clásico beige", categoria: "pantalon", colorHex: "#D8C7A1", estilo: "clasico", hsl: { h: 41, s: 41, l: 74 } },
+      ];
+      const primero = auditoriaDeGuardarropa("clasico", [], undefined, catalogoDosPantalones);
+      expect(primero).not.toBeNull();
+
+      const segundo = auditoriaDeGuardarropa(
+        "clasico",
+        [],
+        undefined,
+        catalogoDosPantalones,
+        new Set([primero!.sugerida.id]),
+      );
+      expect(segundo).not.toBeNull();
+      expect(segundo!.sugerida.id).not.toBe(primero!.sugerida.id);
+    });
+
+    // Verifica que la exclusión llega hasta el fondo de la cascada (capa 8,
+    // sugerenciaDeAccesorio) -- no solo a la primera capa (sugerenciaDeAncla).
+    it("descartar la única sugerencia de una capa de fondo (accesorio) hace que la auditoría entera vuelva a null, no que se rompa a mitad de camino", () => {
+      const pantalon = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10);
+      pantalon.estilo = "formal";
+      const catalogoSoloCorbata: (PresetPrenda & { hsl: HSL })[] = [
+        { id: "corbata-negra", nombre: "Corbata negra", categoria: "accesorio", colorHex: "#1A1A1A", textura: "seda", estilo: "formal", requiereCuello: true, hsl: { h: 0, s: 0, l: 10 }, posicionAccesorio: "cuello" },
+      ];
+      const sinExcluir = auditoriaDeGuardarropa("formal", [pantalon], undefined, catalogoSoloCorbata);
+      expect(sinExcluir).not.toBeNull();
+      expect(sinExcluir!.sugerida.id).toBe("corbata-negra");
+
+      const conExcluir = auditoriaDeGuardarropa(
+        "formal",
+        [pantalon],
+        undefined,
+        catalogoSoloCorbata,
+        new Set(["corbata-negra"]),
+      );
+      expect(conExcluir).toBeNull();
+    });
+  });
 });
 
 // Pedido explícito del usuario: "quiero un sistema de valoración por

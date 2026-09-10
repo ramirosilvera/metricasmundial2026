@@ -369,34 +369,46 @@ export interface CompraPrioritaria {
  *  real y accionable en pleno verano, aunque hoy no se note. `null` solo si
  *  de verdad no hay ningún hueco en ninguna de las 9 capas para este
  *  estilo. */
-function huecoDeEstilo(estilo: Estilo, placard: Prenda[], catalogo: (PresetPrenda & { hsl: HSL })[]): HuecoDeCompra | null {
-  const ancla = sugerenciaDeAncla(estilo, placard, catalogo);
+// Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo
+// (recommend.ts), pedido explícito del usuario: "quiero que se puedan
+// actualizar las recomendaciones de compra... quizás no quiero comprar esa
+// prenda pero quiero ver qué más sugiere". Mismo mecanismo, hilado por
+// esta cadena espejo (ver el comentario de TierHueco sobre por qué existen
+// dos cadenas) para que "Compra prioritaria" en Estadísticas también
+// pueda saltar lo ya descartado.
+function huecoDeEstilo(
+  estilo: Estilo,
+  placard: Prenda[],
+  catalogo: (PresetPrenda & { hsl: HSL })[],
+  excluirIds?: Set<string>,
+): HuecoDeCompra | null {
+  const ancla = sugerenciaDeAncla(estilo, placard, catalogo, excluirIds);
   if (ancla) return { tier: 0, estilo, ...ancla };
 
-  const anclaInvernal = sugerenciaDeAnclaInvernal(estilo, placard, catalogo);
+  const anclaInvernal = sugerenciaDeAnclaInvernal(estilo, placard, catalogo, excluirIds);
   if (anclaInvernal) return { tier: 1, estilo, ...anclaInvernal };
 
-  const abrigoInvierno = sugerenciaDeAbrigoInvierno(estilo, placard, catalogo);
+  const abrigoInvierno = sugerenciaDeAbrigoInvierno(estilo, placard, catalogo, excluirIds);
   if (abrigoInvierno) return { tier: 2, estilo, ...abrigoInvierno };
 
-  const abrigoEntretiempo = sugerenciaDeAbrigoEntretiempo(estilo, placard, catalogo);
+  const abrigoEntretiempo = sugerenciaDeAbrigoEntretiempo(estilo, placard, catalogo, excluirIds);
   if (abrigoEntretiempo) return { tier: 3, estilo, ...abrigoEntretiempo };
 
   if (estilo === "formal") {
-    const saco = sugerenciaDeSacoDeVerano(placard, catalogo);
+    const saco = sugerenciaDeSacoDeVerano(placard, catalogo, excluirIds);
     if (saco) return { tier: 4, estilo, ...saco };
   }
 
-  const variedad = sugerenciaDeVariedad(estilo, placard, catalogo);
+  const variedad = sugerenciaDeVariedad(estilo, placard, catalogo, excluirIds);
   if (variedad) return { tier: 5, estilo, ...variedad };
 
-  const calzado = sugerenciaDeCalzado(estilo, placard, catalogo);
+  const calzado = sugerenciaDeCalzado(estilo, placard, catalogo, excluirIds);
   if (calzado) return { tier: 6, estilo, ...calzado };
 
-  const corteCalzado = sugerenciaDeCorteCalzado(estilo, placard, catalogo);
+  const corteCalzado = sugerenciaDeCorteCalzado(estilo, placard, catalogo, excluirIds);
   if (corteCalzado) return { tier: 7, estilo, ...corteCalzado };
 
-  const accesorio = sugerenciaDeAccesorio(estilo, placard, catalogo);
+  const accesorio = sugerenciaDeAccesorio(estilo, placard, catalogo, excluirIds);
   if (accesorio) return { tier: 8, estilo, ...accesorio };
 
   return null;
@@ -428,8 +440,10 @@ function huecoDeEstilo(estilo: Estilo, placard: Prenda[], catalogo: (PresetPrend
 export function compraDeMayorImpacto(
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario de `excluirIds` en huecoDeEstilo, arriba.
+  excluirIds?: Set<string>,
 ): CompraPrioritaria | null {
-  const huecos = ESTILOS.map((estilo) => huecoDeEstilo(estilo, placard, catalogo)).filter(
+  const huecos = ESTILOS.map((estilo) => huecoDeEstilo(estilo, placard, catalogo, excluirIds)).filter(
     (h): h is HuecoDeCompra => h !== null,
   );
   return elegirCompraPrioritaria(huecos);
@@ -481,7 +495,13 @@ function elegirCompraPrioritaria(huecos: HuecoDeCompra[]): CompraPrioritaria | n
  *    una sola prenda ancla, sin abrigo de invierno cargado, un color que
  *    concentra la mitad del placard) -- directamente motivado por el
  *    trabajo reciente de diferenciar abrigos de entretiempo/invierno. */
-export function analizarFoda(placard: Prenda[]): AnalisisFoda {
+export function analizarFoda(
+  placard: Prenda[],
+  // Ver el comentario de `excluirIds` en huecoDeEstilo, arriba -- pedido
+  // explícito del usuario: poder pedir "otra opción" para la tarjeta de
+  // "Compra prioritaria" sin tener que comprar la que ya se ofreció.
+  excluirIds?: Set<string>,
+): AnalisisFoda {
   const totalPrendas = placard.length;
   const porColor = contarPorColor(placard);
   const variedadColores = porColor.length;
@@ -562,7 +582,7 @@ export function analizarFoda(placard: Prenda[]): AnalisisFoda {
   // oportunidad, aunque el motor ya supiera detectar exactamente ese hueco
   // (lo usa auditoriaDeGuardarropa en "Vestite hoy"). El FODA quedaba
   // ciego a huecos reales que la propia app ya sabía nombrar.
-  const huecosDeCompra = ESTILOS.map((estilo) => huecoDeEstilo(estilo, placard, CATALOGO_CON_HSL)).filter(
+  const huecosDeCompra = ESTILOS.map((estilo) => huecoDeEstilo(estilo, placard, CATALOGO_CON_HSL, excluirIds)).filter(
     (h): h is HuecoDeCompra => h !== null,
   );
   for (const hueco of huecosDeCompra) oportunidades.push(hueco.mensaje);

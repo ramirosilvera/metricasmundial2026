@@ -349,7 +349,22 @@ export function Contenido({
   // se calcula cuando el usuario lo pide, y desaparece si cambia de
   // estilo (ver el useEffect más abajo) para no mostrar una auditoría
   // vieja de otro registro.
-  const [auditoria, setAuditoria] = useState<AuditoriaGuardarropa | "sin_hueco" | null>(null);
+  const [auditoria, setAuditoria] = useState<AuditoriaGuardarropa | "sin_hueco" | "sin_mas_opciones" | null>(null);
+  // Auditoría de Consejo (roles: asesor de imagen/personal shopper), pedido
+  // explícito del usuario: "quiero que se puedan actualizar las
+  // recomendaciones de compra. Porque siempre arroja la misma opción hasta
+  // que compres la prenda recomendada. Y quizás no quiero comprar esa
+  // prenda pero quiero ver qué más sugiere." Dos Sets independientes (no
+  // uno solo): sugerenciaAncla/Abrigo/Saco (automática, un solo hueco
+  // estructural a la vez) y auditoria (la del botón explícito, sobre
+  // TODAS las capas) son flujos distintos con historiales de descarte
+  // propios -- descartar una opción en uno no debería vaciar la memoria
+  // del otro. Nunca se persiste (ni en Supabase ni en localStorage): es
+  // "no me ofrezcas esto DE NUEVO en esta visita", no una preferencia
+  // permanente -- la próxima vez que el usuario entre a la app, el motor
+  // vuelve a partir de cero.
+  const [descartadasAncla, setDescartadasAncla] = useState<Set<string>>(new Set());
+  const [descartadasAuditoria, setDescartadasAuditoria] = useState<Set<string>>(new Set());
   const [editando, setEditando] = useState<OutfitConPrendas | null>(null);
   const [nombreEdicion, setNombreEdicion] = useState("");
   const [prendasEdicion, setPrendasEdicion] = useState<Set<string>>(new Set());
@@ -486,7 +501,29 @@ export function Contenido({
   // auditoriaDeGuardarropa en recommend.ts).
   function hacerRecomendacionDeCompra() {
     if (!estiloSugerido || estiloSugerido === "todos") return;
-    setAuditoria(auditoriaDeGuardarropa(estiloSugerido, placard, climaSugerido) ?? "sin_hueco");
+    // Arranca en limpio -- un click nuevo del botón (después de haber
+    // cerrado la tarjeta) es una consulta nueva, no la continuación de la
+    // sesión de "otra opción" anterior.
+    setDescartadasAuditoria(new Set());
+    setAuditoria(auditoriaDeGuardarropa(estiloSugerido, placard, climaSugerido, CATALOGO_CON_HSL, new Set()) ?? "sin_hueco");
+  }
+
+  // Pedido explícito del usuario: "quiero que se puedan actualizar las
+  // recomendaciones de compra. Porque siempre arroja la misma opción hasta
+  // que compres la prenda recomendada. Y quizás no quiero comprar esa
+  // prenda pero quiero ver qué más sugiere." Descarta el id de la
+  // sugerencia actual y vuelve a correr la auditoría completa con ese
+  // descarte -- misma cascada de 9 capas, la verdadera siguiente mejor
+  // opción, nunca una alternativa inventada. Si ya no queda nada
+  // (agotó las opciones reales del catálogo), "sin_mas_opciones" -- un
+  // mensaje distinto de "sin_hueco" a propósito: acá SÍ había un hueco
+  // real, el usuario simplemente descartó todo lo que el catálogo podía
+  // ofrecer -- decirle "buena variedad" sería directamente falso.
+  function verOtraOpcionAuditoria() {
+    if (!estiloSugerido || estiloSugerido === "todos" || !auditoria || auditoria === "sin_hueco" || auditoria === "sin_mas_opciones") return;
+    const nuevasDescartadas = new Set(descartadasAuditoria).add(auditoria.sugerida.id);
+    setDescartadasAuditoria(nuevasDescartadas);
+    setAuditoria(auditoriaDeGuardarropa(estiloSugerido, placard, climaSugerido, CATALOGO_CON_HSL, nuevasDescartadas) ?? "sin_mas_opciones");
   }
 
   // Pedido explícito del usuario: "la idea es poder usar toda la ropa de
@@ -625,8 +662,8 @@ export function Contenido({
     // llegara a elegir el clima, lo cual no tiene sentido (más abajo se
     // muestra el mensaje de "elegí el clima", no este).
     if (!estiloSugerido || estiloSugerido === "todos" || climaSugerido === null || poolSugeridosPorEstilo.length > 0) return null;
-    return sugerenciaDeAncla(estiloSugerido, placard);
-  }, [estiloSugerido, climaSugerido, poolSugeridosPorEstilo, placard]);
+    return sugerenciaDeAncla(estiloSugerido, placard, CATALOGO_CON_HSL, descartadasAncla);
+  }, [estiloSugerido, climaSugerido, poolSugeridosPorEstilo, placard, descartadasAncla]);
 
   // Un PANTALÓN puntual (no CATEGORIAS_PIERNAS entera) del estilo elegido
   // -- con clima="invierno" un bermuda/short_deportivo nunca ancla nada
@@ -666,9 +703,9 @@ export function Contenido({
     )
       return null;
     return climaSugerido === "invierno"
-      ? sugerenciaDeAbrigoInvierno(estiloSugerido, placard)
-      : sugerenciaDeAbrigoEntretiempo(estiloSugerido, placard);
-  }, [estiloSugerido, climaSugerido, poolSugeridosPorEstilo, hayPantalonDeEsteEstilo, placard]);
+      ? sugerenciaDeAbrigoInvierno(estiloSugerido, placard, CATALOGO_CON_HSL, descartadasAncla)
+      : sugerenciaDeAbrigoEntretiempo(estiloSugerido, placard, CATALOGO_CON_HSL, descartadasAncla);
+  }, [estiloSugerido, climaSugerido, poolSugeridosPorEstilo, hayPantalonDeEsteEstilo, placard, descartadasAncla]);
 
   // Pedido explícito del usuario, reporte real: "el estilo formal no me
   // arroja ningún resultado, y tengo todas las prendas... saco, pantalón,
@@ -693,8 +730,8 @@ export function Contenido({
   // calor -- ver sugerenciaDeSacoDeVerano en recommend.ts.
   const sugerenciaSaco = useMemo(() => {
     if (!formalImposibleConCalor || poolSugeridosPorEstilo.length > 0) return null;
-    return sugerenciaDeSacoDeVerano(placard);
-  }, [formalImposibleConCalor, poolSugeridosPorEstilo, placard]);
+    return sugerenciaDeSacoDeVerano(placard, CATALOGO_CON_HSL, descartadasAncla);
+  }, [formalImposibleConCalor, poolSugeridosPorEstilo, placard, descartadasAncla]);
 
   const paraComprar = useMemo(
     () => tanda(poolParaComprar, offsetParaComprar, VISIBLES_POR_SECCION),
@@ -979,14 +1016,32 @@ export function Contenido({
                     {(sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.mensaje}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", alignSelf: "flex-start" }}
-                  onClick={() => cargarSugerencia((sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.sugerida)}
-                >
-                  + Cargar
-                </button>
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem" }}
+                    onClick={() => cargarSugerencia((sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.sugerida)}
+                  >
+                    + Cargar
+                  </button>
+                  {/* Pedido explícito del usuario: "quiero que se puedan
+                      actualizar las recomendaciones de compra... quizás no
+                      quiero comprar esa prenda pero quiero ver qué más
+                      sugiere". Descarta el id sugerido y deja que el
+                      useMemo recalcule -- ver descartadasAncla arriba y
+                      `excluirIds` en recommend.ts. */}
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem" }}
+                    onClick={() =>
+                      setDescartadasAncla((prev) => new Set(prev).add((sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.sugerida.id))
+                    }
+                  >
+                    🔄 Ver otra opción
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -1110,16 +1165,25 @@ export function Contenido({
             <button type="button" className="btn btn-secondary" onClick={hacerRecomendacionDeCompra}>
               🧵 Hacer recomendación de compra
             </button>
-            {auditoria === "sin_hueco" ? (
+            {(auditoria === "sin_hueco" || auditoria === "sin_mas_opciones") && (
               // Ver el comentario largo de la tarjeta de sugerenciaAncla/
               // Abrigo/Saco más arriba (reporte real del usuario, con
               // captura: "se ve toda colapsada") -- mismo fix.
               <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                 <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "1.2rem" }}>✅</span>
+                  <span style={{ fontSize: "1.2rem" }}>{auditoria === "sin_hueco" ? "✅" : "🤷"}</span>
                   <p style={{ margin: 0, fontSize: "0.85rem", flex: 1, minWidth: 0 }}>
-                    Repasamos ancla, abrigo por clima, variedad de torso, color y calzado para{" "}
-                    {ESTILO_LABEL[estiloSugerido]} -- no encontramos ningún hueco real. Buena variedad.
+                    {auditoria === "sin_hueco"
+                      ? // Pedido explícito del usuario: "quiero que se puedan
+                        // actualizar las recomendaciones de compra" -- este
+                        // mensaje es el genuino "no hay nada que arreglar", a
+                        // propósito distinto del de abajo (que sí hay hueco,
+                        // pero ya se agotaron las opciones del catálogo).
+                        <>
+                          Repasamos ancla, abrigo por clima, variedad de torso, color y calzado para{" "}
+                          {ESTILO_LABEL[estiloSugerido]} -- no encontramos ningún hueco real. Buena variedad.
+                        </>
+                      : `Ya viste todas las opciones que el catálogo tiene para tapar este hueco en ${ESTILO_LABEL[estiloSugerido]} -- ninguna te convenció. No hay más para ofrecerte por ahora.`}
                   </p>
                 </div>
                 <button
@@ -1131,38 +1195,49 @@ export function Contenido({
                   Cerrar
                 </button>
               </div>
-            ) : (
-              auditoria && (
-                <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                    <span style={{ fontSize: "1.2rem" }}>🧑‍🎨</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: "0.85rem" }}>{auditoria.mensaje}</p>
-                      <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                        💵 {rangoPrecioTexto(auditoria.sugerida.categoria)}
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
-                      onClick={() => cargarSugerencia(auditoria.sugerida)}
-                    >
-                      + Cargar {CATEGORIA_LABEL[auditoria.sugerida.categoria].toLowerCase()}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
-                      onClick={() => setAuditoria(null)}
-                    >
-                      Cerrar
-                    </button>
+            )}
+            {auditoria && auditoria !== "sin_hueco" && auditoria !== "sin_mas_opciones" && (
+              <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "1.2rem" }}>🧑‍🎨</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: "0.85rem" }}>{auditoria.mensaje}</p>
+                    <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      💵 {rangoPrecioTexto(auditoria.sugerida.categoria)}
+                    </p>
                   </div>
                 </div>
-              )
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+                    onClick={() => cargarSugerencia(auditoria.sugerida)}
+                  >
+                    + Cargar {CATEGORIA_LABEL[auditoria.sugerida.categoria].toLowerCase()}
+                  </button>
+                  {/* Pedido explícito del usuario: "siempre arroja la misma
+                      opción hasta que compres la prenda recomendada. Y
+                      quizás no quiero comprar esa prenda pero quiero ver
+                      qué más sugiere." Ver verOtraOpcionAuditoria arriba. */}
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+                    onClick={verOtraOpcionAuditoria}
+                  >
+                    🔄 Ver otra opción
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+                    onClick={() => setAuditoria(null)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}

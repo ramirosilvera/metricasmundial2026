@@ -301,7 +301,22 @@ function cargarSugerenciaDeCompra(sugerida: CompraPrioritaria["sugerida"], base:
  *  cruzan hallazgos, esto dice qué hacer primero. `null` (placard sin
  *  ningún hueco) no renderiza nada -- no hay una "recomendación de que no
  *  hay nada que comprar" real que valga la pena mostrar. */
-export function CompraPrioritariaCard({ compra, base }: { compra: CompraPrioritaria; base: string }) {
+export function CompraPrioritariaCard({
+  compra,
+  base,
+  onOtraOpcion,
+}: {
+  compra: CompraPrioritaria;
+  base: string;
+  /** Auditoría de Consejo (roles: personal shopper/comprador retail),
+   *  pedido explícito del usuario: "quiero que se puedan actualizar las
+   *  recomendaciones de compra... quizás no quiero comprar esa prenda pero
+   *  quiero ver qué más sugiere". Opcional a propósito, mismo criterio que
+   *  onGuardarEdicion en Placard.tsx: sin el callback (el snapshot de
+   *  datos de prueba, si alguna vez lo necesita) simplemente no se muestra
+   *  el botón, en vez de romper. */
+  onOtraOpcion?: () => void;
+}) {
   return (
     <div className="card" style={{ borderLeft: "4px solid var(--accent)", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <p className="eyebrow" style={{ margin: 0 }}>
@@ -325,9 +340,16 @@ export function CompraPrioritariaCard({ compra, base }: { compra: CompraPriorita
       <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)" }}>
         💵 {rangoPrecioTexto(compra.sugerida.categoria)}
       </p>
-      <button type="button" className="btn btn-primary" onClick={() => cargarSugerenciaDeCompra(compra.sugerida, base)}>
-        Cargar esta prenda
-      </button>
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-primary" onClick={() => cargarSugerenciaDeCompra(compra.sugerida, base)}>
+          Cargar esta prenda
+        </button>
+        {onOtraOpcion && (
+          <button type="button" className="btn btn-secondary" onClick={onOtraOpcion}>
+            🔄 Ver otra opción
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -349,6 +371,12 @@ export default function Estadisticas() {
   const [placard, setPlacard] = useState<Prenda[] | null>(null);
   const [sinSesion, setSinSesion] = useState(false);
   const [error, setError] = useState("");
+  // Ver el comentario largo de `onOtraOpcion` en CompraPrioritariaCard --
+  // pedido explícito del usuario: "quiero que se puedan actualizar las
+  // recomendaciones de compra". Nunca persistido (mismo criterio que
+  // descartadasAncla/descartadasAuditoria en Outfits.tsx): es memoria de
+  // esta visita, no una preferencia permanente.
+  const [descartadasCompra, setDescartadasCompra] = useState<Set<string>>(new Set());
   const base = (import.meta.env.BASE_URL as string) || "/";
 
   useEffect(() => {
@@ -377,7 +405,7 @@ export default function Estadisticas() {
   const porEstilo = useMemo(() => contarPorEstilo(placard ?? []), [placard]);
   const porEstacion = useMemo(() => contarPorEstacion(placard ?? []), [placard]);
   const porColor = useMemo(() => contarPorColor(placard ?? []), [placard]);
-  const analisis = useMemo(() => analizarFoda(placard ?? []), [placard]);
+  const analisis = useMemo(() => analizarFoda(placard ?? [], descartadasCompra), [placard, descartadasCompra]);
 
   if (!SUPABASE_CONFIGURADO) return <ConfigWarning />;
 
@@ -465,7 +493,11 @@ export default function Estadisticas() {
 
         {analisis.compraPrioritaria && (
           <div style={{ marginBottom: "0.75rem" }}>
-            <CompraPrioritariaCard compra={analisis.compraPrioritaria} base={base} />
+            <CompraPrioritariaCard
+              compra={analisis.compraPrioritaria}
+              base={base}
+              onOtraOpcion={() => setDescartadasCompra((prev) => new Set(prev).add(analisis.compraPrioritaria!.sugerida.id))}
+            />
           </div>
         )}
 
