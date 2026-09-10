@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { nombreColor } from "../lib/color";
 import { rangoPrecioTexto } from "../lib/precios";
+import { compartirOImagen, descargarTexto, generarCSVListaDeseos, generarImagenListaDeseos, type ItemListaDeseos } from "../lib/compartir";
 import {
   analizarFoda,
   contarPorCategoria,
@@ -14,10 +15,11 @@ import {
   type ConteoEstacion,
   type ConteoEstilo,
   type EstrategiaFoda,
+  type NecesidadDeCompra,
 } from "../lib/estadisticas";
 import { ESTILO_LABEL } from "../lib/recommend";
 import { SUPABASE_CONFIGURADO, supabase } from "../lib/supabase";
-import type { Prenda } from "../lib/types";
+import { CATEGORIA_LABEL, type Prenda } from "../lib/types";
 import ConfigWarning from "./ConfigWarning";
 
 /** Fila de gráfico de barras horizontal. `color` es opcional -- sin él,
@@ -301,7 +303,22 @@ function cargarSugerenciaDeCompra(sugerida: CompraPrioritaria["sugerida"], base:
  *  cruzan hallazgos, esto dice qué hacer primero. `null` (placard sin
  *  ningún hueco) no renderiza nada -- no hay una "recomendación de que no
  *  hay nada que comprar" real que valga la pena mostrar. */
-export function CompraPrioritariaCard({ compra, base }: { compra: CompraPrioritaria; base: string }) {
+export function CompraPrioritariaCard({
+  compra,
+  base,
+  onOtraOpcion,
+}: {
+  compra: CompraPrioritaria;
+  base: string;
+  /** Auditoría de Consejo (roles: personal shopper/comprador retail),
+   *  pedido explícito del usuario: "quiero que se puedan actualizar las
+   *  recomendaciones de compra... quizás no quiero comprar esa prenda pero
+   *  quiero ver qué más sugiere". Opcional a propósito, mismo criterio que
+   *  onGuardarEdicion en Placard.tsx: sin el callback (el snapshot de
+   *  datos de prueba, si alguna vez lo necesita) simplemente no se muestra
+   *  el botón, en vez de romper. */
+  onOtraOpcion?: () => void;
+}) {
   return (
     <div className="card" style={{ borderLeft: "4px solid var(--accent)", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       <p className="eyebrow" style={{ margin: 0 }}>
@@ -325,9 +342,134 @@ export function CompraPrioritariaCard({ compra, base }: { compra: CompraPriorita
       <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)" }}>
         💵 {rangoPrecioTexto(compra.sugerida.categoria)}
       </p>
-      <button type="button" className="btn btn-primary" onClick={() => cargarSugerenciaDeCompra(compra.sugerida, base)}>
-        Cargar esta prenda
-      </button>
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-primary" onClick={() => cargarSugerenciaDeCompra(compra.sugerida, base)}>
+          Cargar esta prenda
+        </button>
+        {onOtraOpcion && (
+          <button type="button" className="btn btn-secondary" onClick={onOtraOpcion}>
+            🔄 Ver otra opción
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Convierte el ranking crudo del motor (AnalisisFoda.necesidades) al
+ *  formato ya-listo-para-mostrar que espera compartir.ts (ver el
+ *  comentario largo de ItemListaDeseos ahí: esa capa no sabe de
+ *  catálogo/estilo/precios a propósito). Reusa CATEGORIA_LABEL/ESTILO_LABEL/
+ *  rangoPrecioTexto -- exactamente los mismos labels que ya se ven en el
+ *  resto de la app, nunca un texto inventado aparte para la exportación. */
+function aItemsListaDeseos(necesidades: NecesidadDeCompra[]): ItemListaDeseos[] {
+  return necesidades.map((n, i) => ({
+    prioridad: i + 1,
+    nombre: n.sugerida.nombre,
+    colorHex: n.sugerida.colorHex,
+    categoria: CATEGORIA_LABEL[n.sugerida.categoria],
+    estilos: n.estilos.map((e) => ESTILO_LABEL[e]).join(", "),
+    motivo: n.mensaje,
+    precioTexto: rangoPrecioTexto(n.sugerida.categoria),
+  }));
+}
+
+/** Pedido explícito del usuario: "quiero que en la sección de estadísticas
+ *  me permita exportar una imagen, csv o algo con un formato visual, con
+ *  un estado de recomendaciones ordenadas por ranking de necesidades...
+ *  para poder pasarle ese archivo a las personas para que me hagan un
+ *  regalo de cumple en función de lo que necesito." Roles de moda:
+ *  personal shopper (qué exportar) + diseñador gráfico (que la imagen se
+ *  lea bien reenviada). `necesidades` ya viene ordenado por severidad real
+ *  (mismo motor que compraPrioritaria, ver rankearNecesidades en
+ *  estadisticas.ts) -- esta tarjeta solo lo muestra y lo exporta, no
+ *  inventa un orden propio. `null`/vacío (placard sin huecos) no renderiza
+ *  nada, mismo criterio que CompraPrioritariaCard. */
+export function ListaDeRegalosCard({ necesidades }: { necesidades: NecesidadDeCompra[] }) {
+  const [exportando, setExportando] = useState<"imagen" | "csv" | null>(null);
+  const [error, setError] = useState("");
+
+  if (necesidades.length === 0) return null;
+
+  const items = aItemsListaDeseos(necesidades);
+
+  async function exportarImagen() {
+    setExportando("imagen");
+    setError("");
+    try {
+      const blob = await generarImagenListaDeseos(items);
+      await compartirOImagen(blob, "lista-de-regalos.png", "Mi lista de regalos");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar la imagen.");
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  function exportarCSV() {
+    setError("");
+    try {
+      descargarTexto(generarCSVListaDeseos(items), "lista-de-regalos.csv", "text/csv");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el CSV.");
+    }
+  }
+
+  return (
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      <div>
+        <p className="eyebrow" style={{ margin: 0 }}>
+          🎁 Lista de regalos
+        </p>
+        <p style={{ margin: "0.15rem 0 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+          Ordenada por prioridad -- pasala a quien te quiera hacer un regalo.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        {items.map((item) => (
+          <div key={item.prioridad} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+            <span
+              style={{
+                flexShrink: 0,
+                width: "1.6rem",
+                height: "1.6rem",
+                borderRadius: "999px",
+                background: "var(--accent)",
+                color: "#fff",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {item.prioridad}
+            </span>
+            <span className="color-chip-swatch" style={{ background: item.colorHex, width: "1.6rem", height: "1.6rem", flexShrink: 0, marginTop: "0.05rem" }} />
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ fontSize: "0.85rem" }}>{item.nombre}</strong>
+              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                {item.categoria} · Para {item.estilos}
+              </span>
+              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--accent)" }}>{item.precioTexto}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--danger)" }}>{error}</p>
+      )}
+
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-primary" onClick={exportarImagen} disabled={exportando !== null}>
+          {exportando === "imagen" ? "Armando la imagen…" : "📷 Exportar imagen"}
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={exportarCSV} disabled={exportando !== null}>
+          📄 Exportar CSV
+        </button>
+      </div>
     </div>
   );
 }
@@ -349,6 +491,12 @@ export default function Estadisticas() {
   const [placard, setPlacard] = useState<Prenda[] | null>(null);
   const [sinSesion, setSinSesion] = useState(false);
   const [error, setError] = useState("");
+  // Ver el comentario largo de `onOtraOpcion` en CompraPrioritariaCard --
+  // pedido explícito del usuario: "quiero que se puedan actualizar las
+  // recomendaciones de compra". Nunca persistido (mismo criterio que
+  // descartadasAncla/descartadasAuditoria en Outfits.tsx): es memoria de
+  // esta visita, no una preferencia permanente.
+  const [descartadasCompra, setDescartadasCompra] = useState<Set<string>>(new Set());
   const base = (import.meta.env.BASE_URL as string) || "/";
 
   useEffect(() => {
@@ -377,7 +525,7 @@ export default function Estadisticas() {
   const porEstilo = useMemo(() => contarPorEstilo(placard ?? []), [placard]);
   const porEstacion = useMemo(() => contarPorEstacion(placard ?? []), [placard]);
   const porColor = useMemo(() => contarPorColor(placard ?? []), [placard]);
-  const analisis = useMemo(() => analizarFoda(placard ?? []), [placard]);
+  const analisis = useMemo(() => analizarFoda(placard ?? [], descartadasCompra), [placard, descartadasCompra]);
 
   if (!SUPABASE_CONFIGURADO) return <ConfigWarning />;
 
@@ -465,7 +613,17 @@ export default function Estadisticas() {
 
         {analisis.compraPrioritaria && (
           <div style={{ marginBottom: "0.75rem" }}>
-            <CompraPrioritariaCard compra={analisis.compraPrioritaria} base={base} />
+            <CompraPrioritariaCard
+              compra={analisis.compraPrioritaria}
+              base={base}
+              onOtraOpcion={() => setDescartadasCompra((prev) => new Set(prev).add(analisis.compraPrioritaria!.sugerida.id))}
+            />
+          </div>
+        )}
+
+        {analisis.necesidades.length > 0 && (
+          <div style={{ marginBottom: "0.75rem" }}>
+            <ListaDeRegalosCard necesidades={analisis.necesidades} />
           </div>
         )}
 

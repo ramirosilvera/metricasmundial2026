@@ -3245,6 +3245,22 @@ function mejorCandidatoDelCatalogo(
   // calzado"/"cualquier accesorio" de ese estilo, sea cual sea su corte o
   // posición, lo mismo que ya hacía el resto de esta función.
   filtroExtra?: (preset: PresetPrenda) => boolean,
+  // Auditoría de Consejo (roles: asesor de imagen/personal shopper), pedido
+  // explícito del usuario: "quiero que se puedan actualizar las
+  // recomendaciones de compra. Porque siempre arroja la misma opción hasta
+  // que compres la prenda recomendada. Y quizás no quiero comprar esa
+  // prenda pero quiero ver qué más sugiere." Hueco real: hasta esta ronda
+  // el único filtro de "no ofrecer esto" era `yaEstaEnElPlacard` (algo que
+  // el usuario YA TIENE) -- no había forma de decir "esto no, mostrame la
+  // siguiente mejor opción" para algo que el usuario simplemente no quiere
+  // comprar. `excluirIds` (un Set de ids de PRESET, no de prendas del
+  // placard) es ese descarte -- lo arma y mantiene la UI (Outfits.tsx/
+  // Estadisticas.tsx, un Set en memoria por sesión, nunca persistido) cada
+  // vez que se toca "Ver otra opción", y se le vuelve a pasar en la
+  // siguiente llamada para que el motor salte esa opción y calcule la
+  // verdadera siguiente mejor -- con las mismas reglas de color/formalidad/
+  // cuero/etc. de siempre, nunca una alternativa inventada.
+  excluirIds?: Set<string>,
 ): (PresetPrenda & { hsl: HSL }) | undefined {
   const candidatos = catalogo
     .filter(
@@ -3253,6 +3269,7 @@ function mejorCandidatoDelCatalogo(
         estilosDe(presetAPrendaSintetica(preset)).includes(estilo) &&
         (!soloEstacion || preset.estacion === soloEstacion) &&
         (!filtroExtra || filtroExtra(preset)) &&
+        !excluirIds?.has(preset.id) &&
         // nunca ofrecer comprar algo que el usuario ya tiene -- ver
         // yaEstaEnElPlacard (bug real reportado sobre la tarjeta de compra
         // prioritaria). Si esto deja la lista vacía, la capa que llamó
@@ -3291,6 +3308,8 @@ export function sugerenciaDeVariedad(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaVariedad | null {
   const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
   const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
@@ -3306,7 +3325,7 @@ export function sugerenciaDeVariedad(
   if (torsos.length <= 1) {
     const categorias = torsos.length === 1 ? [torsos[0].categoria] : CATEGORIAS_TORSO;
     for (const categoria of categorias) {
-      const sugerida = mejorCandidatoDelCatalogo(ancla, categoria, estilo, coloresActuales, placard, catalogo);
+      const sugerida = mejorCandidatoDelCatalogo(ancla, categoria, estilo, coloresActuales, placard, catalogo, undefined, undefined, excluirIds);
       if (!sugerida) continue;
       const nombreCat = CATEGORIA_LABEL[categoria].toLowerCase();
       const mensaje =
@@ -3322,7 +3341,7 @@ export function sugerenciaDeVariedad(
   // MAX_COLORES_VARIEDAD_BAJA=2).
   if (prendasEstilo.length >= 3 && coloresActuales.size <= 2) {
     for (const categoria of CATEGORIAS_TORSO) {
-      const sugerida = mejorCandidatoDelCatalogo(ancla, categoria, estilo, coloresActuales, placard, catalogo);
+      const sugerida = mejorCandidatoDelCatalogo(ancla, categoria, estilo, coloresActuales, placard, catalogo, undefined, undefined, excluirIds);
       if (!sugerida) continue;
       return {
         mensaje: `Tus prendas ${ESTILO_LABEL[estilo]} repiten casi siempre el mismo color -- te serviría sumar una "${sugerida.nombre}".`,
@@ -3351,6 +3370,8 @@ export function sugerenciaDeCalzado(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaVariedad | null {
   const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
   const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
@@ -3360,7 +3381,7 @@ export function sugerenciaDeCalzado(
   if (calzados.length > 1) return null;
 
   const coloresActuales = new Set(prendasEstilo.map((p) => nombreColor(p.color_h, p.color_s, p.color_l)));
-  const sugerida = mejorCandidatoDelCatalogo(ancla, "calzado", estilo, coloresActuales, placard, catalogo);
+  const sugerida = mejorCandidatoDelCatalogo(ancla, "calzado", estilo, coloresActuales, placard, catalogo, undefined, undefined, excluirIds);
   if (!sugerida) return null;
 
   const mensaje =
@@ -3416,6 +3437,12 @@ export function sugerenciaDeCorteCalzado(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo --
+  // acá compone naturalmente con el loop de cortes: si el mejor candidato
+  // del corte actual está descartado pero hay otro del MISMO corte, ese
+  // sigue ganando (probá otro color/modelo antes de cambiar de tipo); si no
+  // queda ninguno de ese corte, el loop sigue al siguiente corte faltante.
+  excluirIds?: Set<string>,
 ): SugerenciaVariedad | null {
   const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
   const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
@@ -3443,6 +3470,7 @@ export function sugerenciaDeCorteCalzado(
       catalogo,
       undefined,
       (preset) => preset.corteCalzado === corte,
+      excluirIds,
     );
     if (!sugerida) continue;
     return {
@@ -3486,6 +3514,10 @@ export function sugerenciaDeAccesorio(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo --
+  // mismo criterio de composición que sugerenciaDeCorteCalzado (probá otro
+  // de la misma posición antes de saltar a la siguiente).
+  excluirIds?: Set<string>,
 ): SugerenciaVariedad | null {
   const prendasEstilo = placard.filter((p) => estilosDe(p).includes(estilo));
   const ancla = prendasEstilo.find((p) => CATEGORIAS_PIERNAS.includes(p.categoria));
@@ -3511,6 +3543,7 @@ export function sugerenciaDeAccesorio(
       catalogo,
       undefined,
       (preset) => (preset.posicionAccesorio ?? "cintura") === posicion,
+      excluirIds,
     );
     if (!sugerida) continue;
     const mensaje =
@@ -3539,11 +3572,15 @@ function mejorAnclaDelCatalogo(
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[],
   soloPantalon = false,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo --
+  // mismo mecanismo de "otra opción", acá para la prenda ancla.
+  excluirIds?: Set<string>,
 ): (PresetPrenda & { hsl: HSL }) | undefined {
   const candidatos = catalogo.filter(
     (preset) =>
       (soloPantalon ? preset.categoria === "pantalon" : CATEGORIAS_PIERNAS.includes(preset.categoria)) &&
-      estilosDe(presetAPrendaSintetica(preset)).includes(estilo),
+      estilosDe(presetAPrendaSintetica(preset)).includes(estilo) &&
+      !excluirIds?.has(preset.id),
   );
   // A propósito SIN el filtro `yaEstaEnElPlacard` que sí aplica
   // mejorCandidatoDelCatalogo -- asimetría deliberada, encontrada al
@@ -3598,12 +3635,14 @@ export function sugerenciaDeAncla(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaAncla | null {
   const yaHayAncla = placard.some((p) => CATEGORIAS_PIERNAS.includes(p.categoria) && estilosDe(p).includes(estilo));
   if (yaHayAncla) return null;
 
   const torsosPropios = placard.filter((p) => CATEGORIAS_TORSO.includes(p.categoria) && estilosDe(p).includes(estilo));
-  const sugerida = mejorAnclaDelCatalogo(estilo, torsosPropios, placard, catalogo);
+  const sugerida = mejorAnclaDelCatalogo(estilo, torsosPropios, placard, catalogo, false, excluirIds);
   if (!sugerida) return null;
 
   const mensaje =
@@ -3633,12 +3672,14 @@ export function sugerenciaDeAnclaInvernal(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaAncla | null {
   const hayPantalonLiteral = placard.some((p) => p.categoria === "pantalon" && estilosDe(p).includes(estilo));
   if (hayPantalonLiteral) return null;
 
   const torsosPropios = placard.filter((p) => CATEGORIAS_TORSO.includes(p.categoria) && estilosDe(p).includes(estilo));
-  const sugerida = mejorAnclaDelCatalogo(estilo, torsosPropios, placard, catalogo, true);
+  const sugerida = mejorAnclaDelCatalogo(estilo, torsosPropios, placard, catalogo, true, excluirIds);
   if (!sugerida) return null;
 
   return {
@@ -3688,6 +3729,8 @@ function sugerenciaDeAbrigoDeClima(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[],
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaAbrigoInvierno | null {
   const ancla = placard.find((p) => p.categoria === "pantalon" && estilosDe(p).includes(estilo));
   if (!ancla) return null;
@@ -3701,7 +3744,7 @@ function sugerenciaDeAbrigoDeClima(
 
   const climaLabel = clima === "invierno" ? "Con frío de verdad" : "Con clima templado (entretiempo)";
   for (const categoria of CATEGORIAS_ABRIGO) {
-    const sugerida = mejorCandidatoDelCatalogo(ancla, categoria, estilo, coloresActuales, placard, catalogo, clima);
+    const sugerida = mejorCandidatoDelCatalogo(ancla, categoria, estilo, coloresActuales, placard, catalogo, clima, undefined, excluirIds);
     if (!sugerida) continue;
     return {
       mensaje: `${climaLabel}, "${ESTILO_LABEL[estilo]}" necesita un abrigo de ${clima} real puesto -- lo que tenés cargado en ese registro no alcanza (otra estación, o sin ninguna cargada). Te serviría sumar "${sugerida.nombre}".`,
@@ -3744,8 +3787,10 @@ export function sugerenciaDeAbrigoInvierno(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaAbrigoInvierno | null {
-  return sugerenciaDeAbrigoDeClima("invierno", estilo, placard, catalogo);
+  return sugerenciaDeAbrigoDeClima("invierno", estilo, placard, catalogo, excluirIds);
 }
 
 /** Contraparte de sugerenciaDeAbrigoInvierno para clima="entretiempo" --
@@ -3758,8 +3803,10 @@ export function sugerenciaDeAbrigoEntretiempo(
   estilo: Estilo,
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaAbrigoInvierno | null {
-  return sugerenciaDeAbrigoDeClima("entretiempo", estilo, placard, catalogo);
+  return sugerenciaDeAbrigoDeClima("entretiempo", estilo, placard, catalogo, excluirIds);
 }
 
 export interface SugerenciaSacoDeVerano {
@@ -3787,6 +3834,8 @@ export interface SugerenciaSacoDeVerano {
 export function sugerenciaDeSacoDeVerano(
   placard: Prenda[],
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Ver el comentario largo de `excluirIds` en mejorCandidatoDelCatalogo.
+  excluirIds?: Set<string>,
 ): SugerenciaSacoDeVerano | null {
   const ancla = placard.find((p) => p.categoria === "pantalon" && estilosDe(p).includes("formal"));
   if (!ancla) return null;
@@ -3794,7 +3843,9 @@ export function sugerenciaDeSacoDeVerano(
   if (placard.some(esSacoLivianoDeVerano)) return null;
 
   const candidatos = catalogo
-    .filter((preset) => preset.categoria === "saco" && (preset.textura === "lino" || preset.textura === "algodon"))
+    .filter(
+      (preset) => preset.categoria === "saco" && (preset.textura === "lino" || preset.textura === "algodon") && !excluirIds?.has(preset.id),
+    )
     .map((preset) => {
       const [r] = recomendar(ancla, [presetAPrendaSintetica(preset)], placard);
       return { preset, score: r.score };
@@ -3890,39 +3941,49 @@ export function auditoriaDeGuardarropa(
   placard: Prenda[],
   clima?: Estacion | null,
   catalogo: (PresetPrenda & { hsl: HSL })[] = CATALOGO_CON_HSL,
+  // Auditoría de Consejo (roles: asesor de imagen/personal shopper), pedido
+  // explícito del usuario: "quiero que se puedan actualizar las
+  // recomendaciones de compra... quizás no quiero comprar esa prenda pero
+  // quiero ver qué más sugiere". Ver el comentario largo de `excluirIds` en
+  // mejorCandidatoDelCatalogo -- Outfits.tsx mantiene el Set y lo pasa acá
+  // cada vez que el usuario toca "Ver otra opción" sobre el resultado del
+  // botón "Hacer recomendación de compra", para que la cascada entera
+  // (las 9 capas de abajo) salte lo ya descartado y encuentre la
+  // verdadera siguiente mejor opción, en vez de repetir siempre la misma.
+  excluirIds?: Set<string>,
 ): AuditoriaGuardarropa | null {
-  const ancla = sugerenciaDeAncla(estilo, placard, catalogo);
+  const ancla = sugerenciaDeAncla(estilo, placard, catalogo, excluirIds);
   if (ancla) return ancla;
 
   const hayPantalon = placard.some((p) => p.categoria === "pantalon" && estilosDe(p).includes(estilo));
 
   if (clima === "invierno" && !hayPantalon) {
-    const anclaInvernal = sugerenciaDeAnclaInvernal(estilo, placard, catalogo);
+    const anclaInvernal = sugerenciaDeAnclaInvernal(estilo, placard, catalogo, excluirIds);
     if (anclaInvernal) return anclaInvernal;
   }
 
   if (hayPantalon) {
-    const abrigoInvierno = sugerenciaDeAbrigoInvierno(estilo, placard, catalogo);
+    const abrigoInvierno = sugerenciaDeAbrigoInvierno(estilo, placard, catalogo, excluirIds);
     if (abrigoInvierno) return abrigoInvierno;
-    const abrigoEntretiempo = sugerenciaDeAbrigoEntretiempo(estilo, placard, catalogo);
+    const abrigoEntretiempo = sugerenciaDeAbrigoEntretiempo(estilo, placard, catalogo, excluirIds);
     if (abrigoEntretiempo) return abrigoEntretiempo;
   }
 
   if (estilo === "formal") {
-    const saco = sugerenciaDeSacoDeVerano(placard, catalogo);
+    const saco = sugerenciaDeSacoDeVerano(placard, catalogo, excluirIds);
     if (saco) return saco;
   }
 
-  const variedad = sugerenciaDeVariedad(estilo, placard, catalogo);
+  const variedad = sugerenciaDeVariedad(estilo, placard, catalogo, excluirIds);
   if (variedad) return variedad;
 
-  const calzado = sugerenciaDeCalzado(estilo, placard, catalogo);
+  const calzado = sugerenciaDeCalzado(estilo, placard, catalogo, excluirIds);
   if (calzado) return calzado;
 
-  const corteCalzado = sugerenciaDeCorteCalzado(estilo, placard, catalogo);
+  const corteCalzado = sugerenciaDeCorteCalzado(estilo, placard, catalogo, excluirIds);
   if (corteCalzado) return corteCalzado;
 
-  return sugerenciaDeAccesorio(estilo, placard, catalogo);
+  return sugerenciaDeAccesorio(estilo, placard, catalogo, excluirIds);
 }
 
 /** Diff entre las prendas actuales de un outfit guardado y las que el

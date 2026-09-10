@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { envolverTexto } from "./compartir";
+import { envolverTexto, generarCSVListaDeseos, type ItemListaDeseos } from "./compartir";
 
 // medir() simulado: cada carácter mide 1 unidad -- no depende de canvas
 // real (vitest corre en Node sin DOM), pero alcanza para probar la lógica
@@ -39,5 +39,58 @@ describe("envolverTexto", () => {
       const resultado = envolverTexto(texto, ancho, medirPorCaracter);
       expect(resultado.join(" ")).toBe(texto);
     }
+  });
+});
+
+// Consejo, ronda siguiente -- pedido explícito del usuario: "exportar...
+// un csv... con un ranking de necesidades... para pasarle ese archivo a
+// las personas para que me hagan un regalo de cumple".
+describe("generarCSVListaDeseos", () => {
+  function mkItem(overrides: Partial<ItemListaDeseos> = {}): ItemListaDeseos {
+    return {
+      prioridad: 1,
+      nombre: "Zapatillas de lona negras",
+      colorHex: "#1A1A1A",
+      categoria: "Calzado",
+      estilos: "Urbano",
+      motivo: "Te falta una zapatilla de lona en ese registro.",
+      precioTexto: "Aprox. US$12–US$100 en Argentina (de tercera a primera marca)",
+      ...overrides,
+    };
+  }
+
+  it("arma el encabezado y una fila por item, separados por coma", () => {
+    const csv = generarCSVListaDeseos([mkItem()]);
+    const [encabezado, fila] = csv.split("\r\n");
+    expect(encabezado).toBe("Prioridad,Prenda,Categoría,Para qué estilo,Motivo,Precio de referencia (Argentina)");
+    expect(fila).toContain("Zapatillas de lona negras");
+    expect(fila).toContain("Urbano");
+  });
+
+  it("respeta el orden de prioridad ya dado -- no reordena", () => {
+    const csv = generarCSVListaDeseos([mkItem({ prioridad: 1, nombre: "A" }), mkItem({ prioridad: 2, nombre: "B" })]);
+    const filas = csv.split("\r\n").slice(1);
+    expect(filas[0]).toContain("A");
+    expect(filas[1]).toContain("B");
+  });
+
+  // Caso real, no de borde: un motivo con coma ("...te falta una zapatilla
+  // de lona, un tipo que todavía no tenés...") es el texto REAL que ya usa
+  // el motor (ver sugerenciaDeCorteCalzado en recommend.ts) -- sin escapar
+  // bien, esto rompería el CSV en columnas de más al abrirlo en Excel/Sheets.
+  it("entrecomilla valores con comas (RFC 4180), sin romper las columnas", () => {
+    const csv = generarCSVListaDeseos([mkItem({ motivo: "Te falta un mocasín, un tipo que todavía no tenés en ese registro." })]);
+    const fila = csv.split("\r\n")[1];
+    expect(fila).toContain('"Te falta un mocasín, un tipo que todavía no tenés en ese registro."');
+  });
+
+  it("entrecomilla y duplica comillas internas", () => {
+    const csv = generarCSVListaDeseos([mkItem({ nombre: 'Campera "urbana" negra' })]);
+    const fila = csv.split("\r\n")[1];
+    expect(fila).toContain('"Campera ""urbana"" negra"');
+  });
+
+  it("lista vacía -> solo el encabezado", () => {
+    expect(generarCSVListaDeseos([])).toBe("Prioridad,Prenda,Categoría,Para qué estilo,Motivo,Precio de referencia (Argentina)");
   });
 });
