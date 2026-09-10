@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { SUPABASE_CONFIGURADO, supabase } from "../lib/supabase";
 import type { PresetPrenda } from "../lib/catalogo";
 import { hexToHsl, nombreColor } from "../lib/color";
+import { rangoPrecioTexto } from "../lib/precios";
 import { CATEGORIA_LABEL, CATEGORIAS_COMPLEMENTARIAS, descripcionPrenda, type Categoria, type Prenda } from "../lib/types";
 import { ESTILO_LABEL, recomendar } from "../lib/recommend";
 import CatalogoPicker from "./CatalogoPicker";
@@ -223,6 +224,14 @@ export default function Probar() {
               </strong>
               <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.85rem" }}>
                 {veredicto ? veredicto.texto : "Así combina con lo que ya tenés"}
+              </p>
+              {/* Auditoría de Consejo (rol: comprador retail), pedido
+                  explícito del usuario: esta es LA pantalla de "¿me la
+                  compro?" -- si hay un lugar donde el precio es
+                  indispensable, es acá, antes que en cualquier otra
+                  sugerencia pasiva del resto de la app. Ver precios.ts. */}
+              <p style={{ margin: "0.2rem 0 0", color: "var(--text-muted)", fontSize: "0.78rem" }}>
+                💵 {rangoPrecioTexto(pruebaBase.categoria)}
               </p>
             </div>
             <button className="btn btn-primary" style={{ fontSize: "0.8rem", padding: "0.5rem 0.9rem" }} onClick={cargarAlPlacard}>
