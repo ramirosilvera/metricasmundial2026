@@ -958,13 +958,31 @@ export function Contenido({
                     : `No armamos ningún look ${ESTILO_LABEL[estiloSugerido]} todavía con lo que tenés cargado.${sugerenciaAncla ? "" : ` Mirá "Ideas para comprar" más abajo, o probá otra ocasión.`}`}
             </p>
             {(sugerenciaAncla || sugerenciaAbrigo || sugerenciaSaco) && (
-              <div className="card" style={{ marginTop: "0.6rem", display: "flex", gap: "0.6rem", alignItems: "center" }}>
-                <span style={{ fontSize: "1.2rem" }}>💡</span>
-                <p style={{ margin: 0, fontSize: "0.85rem", flex: 1 }}>{(sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.mensaje}</p>
+              // Reporte real del usuario, con captura: en pantallas angostas
+              // esta tarjeta (ícono + texto + botón, todo en una sola fila
+              // que se supone que envuelve) quedaba "toda colapsada" -- el
+              // texto se angostaba a una columna de una o dos palabras por
+              // línea mientras el botón flotaba aparte con espacio en
+              // blanco alrededor. Causa real: `flex: 1` en el párrafo
+              // competía por ancho con el botón EN LA MISMA fila, y sin
+              // `minWidth: 0` un ítem flex no se angosta más allá del ancho
+              // mínimo de su contenido -- con texto largo, eso fuerza el
+              // wrap carácter por carácter en vez de repartir el ancho
+              // bien. Fix: fila de ícono+texto SOLA (sin competir por
+              // ancho con ningún botón) y los botones en su propia fila
+              // debajo -- mismo criterio en las 3 tarjetas hermanas de más
+              // abajo (tarjetaSugerencia, sin_hueco, auditoria).
+              <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "1.2rem" }}>💡</span>
+                  <p style={{ margin: 0, fontSize: "0.85rem", flex: 1, minWidth: 0 }}>
+                    {(sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.mensaje}
+                  </p>
+                </div>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", alignSelf: "flex-start" }}
                   onClick={() => cargarSugerencia((sugerenciaAncla ?? sugerenciaAbrigo ?? sugerenciaSaco)!.sugerida)}
                 >
                   + Cargar
@@ -1018,32 +1036,39 @@ export function Contenido({
               </button>
             )}
             {tarjetaSugerencia && (
-              <div className="card" style={{ marginTop: "0.6rem", display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "1.2rem" }}>💡</span>
-                <p style={{ margin: 0, fontSize: "0.85rem", flex: 1 }}>
-                  {tarjetaSugerencia.actual !== undefined && (
-                    <>
-                      Tu mejor outfit hoy tiene <Estrellas puntaje={tarjetaSugerencia.actual} />.{" "}
-                    </>
-                  )}
-                  {tarjetaSugerencia.mensaje}
-                  {tarjetaSugerencia.conSugerencia !== undefined && (
-                    <>
-                      {" "}
-                      Subiría a <Estrellas puntaje={tarjetaSugerencia.conSugerencia} />.
-                    </>
-                  )}
-                  {/* Ver el comentario largo de rangoPrecioTexto en precios.ts:
-                      auditoría de Consejo (rol: comprador retail), pedido
-                      explícito del usuario -- una recomendación de compra sin
-                      referencia de plata no ayuda a decidir. Una línea por
-                      prenda sugerida (comboExcelencia puede traer 2 a la vez). */}
-                  {tarjetaSugerencia.sugeridas.map((s) => (
-                    <span key={s.id} style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                      💵 {rangoPrecioTexto(s.categoria)}
-                    </span>
-                  ))}
-                </p>
+              // Ver el comentario largo de la tarjeta de sugerenciaAncla/
+              // Abrigo/Saco más arriba (reporte real del usuario, con
+              // captura: "se ve toda colapsada") -- mismo fix, misma causa:
+              // fila de ícono+texto separada de la fila de botones, para
+              // que el texto nunca tenga que competir por ancho con ellos.
+              <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "1.2rem" }}>💡</span>
+                  <p style={{ margin: 0, fontSize: "0.85rem", flex: 1, minWidth: 0 }}>
+                    {tarjetaSugerencia.actual !== undefined && (
+                      <>
+                        Tu mejor outfit hoy tiene <Estrellas puntaje={tarjetaSugerencia.actual} />.{" "}
+                      </>
+                    )}
+                    {tarjetaSugerencia.mensaje}
+                    {tarjetaSugerencia.conSugerencia !== undefined && (
+                      <>
+                        {" "}
+                        Subiría a <Estrellas puntaje={tarjetaSugerencia.conSugerencia} />.
+                      </>
+                    )}
+                    {/* Ver el comentario largo de rangoPrecioTexto en precios.ts:
+                        auditoría de Consejo (rol: comprador retail), pedido
+                        explícito del usuario -- una recomendación de compra sin
+                        referencia de plata no ayuda a decidir. Una línea por
+                        prenda sugerida (comboExcelencia puede traer 2 a la vez). */}
+                    {tarjetaSugerencia.sugeridas.map((s) => (
+                      <span key={s.id} style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                        💵 {rangoPrecioTexto(s.categoria)}
+                      </span>
+                    ))}
+                  </p>
+                </div>
                 {/* comboExcelencia puede sugerir 2 prendas a la vez (ver su
                     comentario en recommend.ts) -- un botón por prenda, cada
                     uno navega a "prenda nueva" precargado con ESA prenda
@@ -1086,16 +1111,21 @@ export function Contenido({
               🧵 Hacer recomendación de compra
             </button>
             {auditoria === "sin_hueco" ? (
-              <div className="card" style={{ marginTop: "0.6rem", display: "flex", gap: "0.6rem", alignItems: "center" }}>
-                <span style={{ fontSize: "1.2rem" }}>✅</span>
-                <p style={{ margin: 0, fontSize: "0.85rem", flex: 1 }}>
-                  Repasamos ancla, abrigo por clima, variedad de torso, color y calzado para{" "}
-                  {ESTILO_LABEL[estiloSugerido]} -- no encontramos ningún hueco real. Buena variedad.
-                </p>
+              // Ver el comentario largo de la tarjeta de sugerenciaAncla/
+              // Abrigo/Saco más arriba (reporte real del usuario, con
+              // captura: "se ve toda colapsada") -- mismo fix.
+              <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "1.2rem" }}>✅</span>
+                  <p style={{ margin: 0, fontSize: "0.85rem", flex: 1, minWidth: 0 }}>
+                    Repasamos ancla, abrigo por clima, variedad de torso, color y calzado para{" "}
+                    {ESTILO_LABEL[estiloSugerido]} -- no encontramos ningún hueco real. Buena variedad.
+                  </p>
+                </div>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", whiteSpace: "nowrap" }}
+                  style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem", alignSelf: "flex-start" }}
                   onClick={() => setAuditoria(null)}
                 >
                   Cerrar
@@ -1103,13 +1133,15 @@ export function Contenido({
               </div>
             ) : (
               auditoria && (
-                <div className="card" style={{ marginTop: "0.6rem", display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "1.2rem" }}>🧑‍🎨</span>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: "0.85rem" }}>{auditoria.mensaje}</p>
-                    <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                      💵 {rangoPrecioTexto(auditoria.sugerida.categoria)}
-                    </p>
+                <div className="card" style={{ marginTop: "0.6rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+                    <span style={{ fontSize: "1.2rem" }}>🧑‍🎨</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: "0.85rem" }}>{auditoria.mensaje}</p>
+                      <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                        💵 {rangoPrecioTexto(auditoria.sugerida.categoria)}
+                      </p>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
                     <button

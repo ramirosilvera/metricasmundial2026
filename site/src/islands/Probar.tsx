@@ -218,7 +218,14 @@ export default function Probar() {
                 manga={pruebaBase.manga}
               />
             </span>
-            <div style={{ flex: 1 }}>
+            {/* minWidth: 0 -- mismo fix que las tarjetas de Outfits.tsx
+                (reporte real del usuario, con captura: "se ve toda
+                colapsada"): sin esto, un ítem flex con `flex: 1` no se
+                angosta más allá del ancho mínimo de su contenido, así que
+                al competir por ancho con el ícono y el botón de al lado
+                (los tres en la misma fila, sin wrap) el texto puede forzar
+                un desborde en vez de ajustarse bien. */}
+            <div style={{ flex: 1, minWidth: 0 }}>
               <strong>
                 {descripcionPrenda(pruebaBase)} · {nombreColor(pruebaBase.color_h, pruebaBase.color_s, pruebaBase.color_l)}
               </strong>
