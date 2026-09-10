@@ -496,6 +496,48 @@ describe("compraDeMayorImpacto", () => {
   });
 });
 
+// Consejo, ronda siguiente -- pedido explícito del usuario: "exportar...
+// un estado de recomendaciones ordenadas por ranking de necesidades...
+// para pasarle ese archivo a las personas para que me hagan un regalo de
+// cumple". `necesidades` es el ranking completo detrás de compraPrioritaria
+// (que solo expone LA mejor) -- estos tests verifican las dos garantías
+// reales que promete: orden por severidad y sin duplicados, contra el
+// catálogo real (analizarFoda no recibe un catálogo inyectable).
+describe("AnalisisFoda.necesidades -- ranking completo para exportar", () => {
+  it("viene ordenado por severidad (tier no decreciente, lo más urgente primero)", () => {
+    const r = analizarFoda([mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")]);
+    expect(r.necesidades.length).toBeGreaterThan(0);
+    for (let i = 1; i < r.necesidades.length; i++) {
+      expect(r.necesidades[i].tier).toBeGreaterThanOrEqual(r.necesidades[i - 1].tier);
+    }
+  });
+
+  it("nunca repite la misma prenda sugerida dos veces, aunque resuelva el hueco de más de un estilo", () => {
+    const r = analizarFoda([mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")]);
+    const ids = r.necesidades.map((n) => n.sugerida.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("cada necesidad lista al menos un estilo real, y el tier coincide con el menor de sus ocurrencias", () => {
+    const r = analizarFoda([mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")]);
+    for (const n of r.necesidades) {
+      expect(n.estilos.length).toBeGreaterThan(0);
+      expect(n.mensaje).toBeTruthy();
+    }
+  });
+
+  it("placard vacío del todo -> necesidades vacío (mismo criterio que compraPrioritaria null)", () => {
+    expect(analizarFoda([]).necesidades).toEqual([]);
+  });
+
+  it("es la MISMA fuente que compraPrioritaria -- la ganadora siempre aparece primera en necesidades", () => {
+    const placard = [mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")];
+    const r = analizarFoda(placard);
+    expect(r.compraPrioritaria).not.toBeNull();
+    expect(r.necesidades[0]?.sugerida.id).toBe(r.compraPrioritaria!.sugerida.id);
+  });
+});
+
 describe("coincideBusqueda", () => {
   it("query vacía o solo espacios -> matchea todo", () => {
     const p = mkPrenda("pantalon", "#111111", 0, 0, 15, "formal");

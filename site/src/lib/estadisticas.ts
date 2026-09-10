@@ -177,6 +177,35 @@ export interface AnalisisFoda {
    *  estilos (placard maduro en todas las puntas) -- mismo criterio de "no
    *  inventar una sugerencia sin motivo real" que el resto de este módulo. */
   compraPrioritaria: CompraPrioritaria | null;
+  /** Ranking completo de huecos de compra (hasta 6, uno por estilo con
+   *  algo pendiente) -- pedido explícito del usuario: "exportar... un
+   *  estado de recomendaciones ordenadas por ranking de necesidades...
+   *  para pasarle ese archivo a las personas para que me hagan un regalo
+   *  de cumple". `compraPrioritaria` ya elige LA mejor compra puntual;
+   *  esto expone la lista entera detrás de esa elección, ordenada por la
+   *  misma severidad (TierHueco, 0=bloqueo total, 8=el hueco más sutil) --
+   *  mismo dato que ya alimenta `oportunidades`, sin recalcular nada.
+   *  Deduplicado por prenda sugerida: si el catálogo elige la MISMA
+   *  prenda para tapar el hueco de más de un estilo (ej. un cinturón
+   *  negro que sirve para formal Y para oficina), aparece una sola vez en
+   *  la lista, con todos los estilos a los que ayuda -- mismo criterio
+   *  real que ya usa compraDeMayorImpacto para "esta compra resuelve más
+   *  de un hueco a la vez", pero acá se ve toda la lista, no solo la
+   *  ganadora. */
+  necesidades: NecesidadDeCompra[];
+}
+
+/** Ver el campo `necesidades` de AnalisisFoda arriba. */
+export interface NecesidadDeCompra {
+  tier: TierHueco;
+  /** Todos los estilos para los que esta MISMA prenda del catálogo tapa un
+   *  hueco -- casi siempre uno solo, a veces más de uno (ver el comentario
+   *  de `necesidades`). */
+  estilos: Estilo[];
+  /** El mensaje del hueco de menor tier (más severo) entre los que esta
+   *  prenda resuelve -- la explicación más relevante de las posibles. */
+  mensaje: string;
+  sugerida: PresetPrenda & { hsl: HSL };
 }
 
 export type NivelSaludFoda = "solido" | "con_huecos" | "fragil";
@@ -476,6 +505,42 @@ function elegirCompraPrioritaria(huecos: HuecoDeCompra[]): CompraPrioritaria | n
   return { estilo: mejor.estilo, mensaje, sugerida: mejor.sugerida };
 }
 
+/** Núcleo puro de `necesidades` en AnalisisFoda -- pedido explícito del
+ *  usuario: "exportar... un estado de recomendaciones ordenadas por
+ *  ranking de necesidades... para pasarle ese archivo a las personas para
+ *  que me hagan un regalo de cumple". Mismo criterio de reuso que
+ *  elegirCompraPrioritaria (recibe el array de huecos ya calculado, no
+ *  vuelve a llamar huecoDeEstilo) -- separado para poder testearlo sin
+ *  depender de un placard real.
+ *
+ *  Dos pasos: (1) agrupar por `sugerida.id` -- si el catálogo elige la
+ *  MISMA prenda para más de un estilo (ej. un cinturón negro que resuelve
+ *  formal y oficina a la vez), es una sola línea de regalo, no dos, con
+ *  todos los estilos que ayuda listados; (2) ordenar por el tier más
+ *  severo de cada grupo -- lo más urgente primero, el mismo orden de
+ *  prioridad que ya usa auditoriaDeGuardarropa/compraDeMayorImpacto, no
+ *  un ranking inventado aparte -- y a igual tier, por cuántos estilos
+ *  resuelve (desempate), EL MISMO criterio que ya usa
+ *  elegirCompraPrioritaria (vecesPorId) para elegir la ganadora -- así el
+ *  primer puesto de este ranking siempre coincide con compraPrioritaria,
+ *  nunca dos lecturas que se contradicen entre sí. */
+function rankearNecesidades(huecos: HuecoDeCompra[]): NecesidadDeCompra[] {
+  const porId = new Map<string, NecesidadDeCompra>();
+  for (const hueco of huecos) {
+    const existente = porId.get(hueco.sugerida.id);
+    if (!existente) {
+      porId.set(hueco.sugerida.id, { tier: hueco.tier, estilos: [hueco.estilo], mensaje: hueco.mensaje, sugerida: hueco.sugerida });
+      continue;
+    }
+    existente.estilos.push(hueco.estilo);
+    if (hueco.tier < existente.tier) {
+      existente.tier = hueco.tier;
+      existente.mensaje = hueco.mensaje;
+    }
+  }
+  return [...porId.values()].sort((a, b) => a.tier - b.tier || b.estilos.length - a.estilos.length);
+}
+
 /** Lectura "de MBA" del placard vía la matriz FODA/SWOT clásica -- pedido
  *  explícito del usuario, reemplazando el "fortalezas y oportunidades de
  *  mejora" anterior. Esa versión anterior, con la mejor intención, mezclaba
@@ -524,6 +589,7 @@ export function analizarFoda(
       veredicto,
       estrategias: [],
       compraPrioritaria: null,
+      necesidades: [],
     };
   }
 
@@ -619,6 +685,7 @@ export function analizarFoda(
   const estrategias = estrategiasTows(fortalezas, debilidades, oportunidades, amenazas);
   const { nivelSalud, veredicto } = diagnosticoGeneral(fortalezas, debilidades, amenazas, totalPrendas);
   const compraPrioritaria = elegirCompraPrioritaria(huecosDeCompra);
+  const necesidades = rankearNecesidades(huecosDeCompra);
   return {
     totalPrendas,
     variedadColores,
@@ -630,6 +697,7 @@ export function analizarFoda(
     veredicto,
     estrategias,
     compraPrioritaria,
+    necesidades,
   };
 }
 

@@ -246,6 +246,219 @@ export async function generarImagenOutfit(
  * desktop), se descarga el PNG en vez de fingir un botón de WhatsApp que
  * en realidad no podría adjuntar nada.
  */
+/**
+ * Lista de regalos -- pedido explícito del usuario: "quiero que en la
+ * sección de estadísticas me permita exportar una imagen, csv o algo con
+ * un formato visual, con un estado de recomendaciones ordenadas por
+ * ranking de necesidades... para poder pasarle ese archivo a las personas
+ * para que me hagan un regalo de cumple en función de lo que necesito."
+ * Roles de moda: personal shopper (qué mostrar -- precio y motivo, no solo
+ * el nombre) y diseñador gráfico (que se lea bien reenviado por WhatsApp/
+ * mail, el mismo canal que ya usa generarImagenOutfit).
+ *
+ * `compartir.ts` no sabe de placard/catálogo/motor de recomendación a
+ * propósito (repite el criterio ya establecido de DatosOutfitParaCompartir
+ * más arriba: recibe datos YA formateados para mostrar, nunca recalcula
+ * lógica de negocio) -- quien arma este array (Estadisticas.tsx) es quien
+ * conoce AnalisisFoda.necesidades y precios.ts.
+ */
+export interface ItemListaDeseos {
+  /** 1-based -- el orden en que ya vienen los items importa (ranking real
+   *  de severidad, ver rankearNecesidades en estadisticas.ts), esto es
+   *  solo el número que se dibuja/exporta junto a cada fila. */
+  prioridad: number;
+  nombre: string;
+  colorHex: string;
+  categoria: string;
+  /** Ya formateado como texto legible (ej. "Formal, Oficina") -- una
+   *  prenda puede tapar el hueco de más de un estilo a la vez. */
+  estilos: string;
+  motivo: string;
+  precioTexto: string;
+}
+
+function csvEscape(valor: string): string {
+  // RFC 4180: entrecomillar si el valor tiene coma, comilla o salto de
+  // línea, duplicando las comillas internas. El motivo/mensaje real puede
+  // traer comas ("Zapatillas de lona negras, aprox...") así que esto no es
+  // un caso de borde raro -- pasa con la primera fila real.
+  if (/[",\r\n]/.test(valor)) return `"${valor.replace(/"/g, '""')}"`;
+  return valor;
+}
+
+/** CSV de la lista de regalos, ya ordenada por prioridad -- separado de la
+ *  descarga (ver descargarTexto más abajo) para poder testear el formato
+ *  sin DOM, mismo criterio que envolverTexto arriba. Sin la columna de
+ *  color (un hex no le sirve a quien va a comprar el regalo) -- si hace
+ *  falta el color exacto, la imagen (generarImagenListaDeseos) ya lo
+ *  muestra como swatch visual. */
+export function generarCSVListaDeseos(items: ItemListaDeseos[]): string {
+  const encabezado = ["Prioridad", "Prenda", "Categoría", "Para qué estilo", "Motivo", "Precio de referencia (Argentina)"];
+  const filas = items.map((it) => [String(it.prioridad), it.nombre, it.categoria, it.estilos, it.motivo, it.precioTexto]);
+  return [encabezado, ...filas].map((fila) => fila.map(csvEscape).join(",")).join("\r\n");
+}
+
+/** Descarga un archivo de texto plano (CSV) -- mismo mecanismo de descarga
+ *  que el fallback de compartirOImagen (createObjectURL + <a download>),
+ *  separado porque un CSV no pasa por el share sheet de imágenes (no tiene
+ *  sentido "compartir" un CSV a WhatsApp -- ahí lo útil es abrirlo en
+ *  Excel/Sheets, así que siempre se descarga). Con BOM UTF-8 (`﻿`)
+ *  -- sin esto, Excel en Windows (el destino más probable de un CSV que
+ *  alguien va a abrir para ver una lista) interpreta los acentos como
+ *  caracteres random en vez de UTF-8. */
+export function descargarTexto(contenido: string, nombreArchivo: string, tipoMime: string): void {
+  const blob = new Blob(["﻿" + contenido], { type: `${tipoMime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+const COLOR_BORDE = "#e6e0d4";
+
+/** Alto de una fila de la lista de regalos -- separado para poder medir
+ *  el alto TOTAL antes de crear el canvas final (mismo patrón de dos
+ *  pasadas que dibujarBloqueTexto: medir con un canvas descartable,
+ *  dibujar de verdad con el alto ya calculado, para que ninguna fila
+ *  quede cortada por el pie de página). Devuelve el `y` final. */
+function dibujarFilaListaDeseos(ctx: CanvasRenderingContext2D, item: ItemListaDeseos, yInicial: number, dibujar: boolean): number {
+  const xIzquierda = 70;
+  const xTexto = 190;
+  const anchoTexto = ANCHO - xTexto - 70;
+  let y = yInicial;
+
+  if (dibujar) {
+    // círculo de prioridad -- el número de ranking es lo primero que se
+    // lee, antes que el nombre: es justamente el dato nuevo de esta
+    // función (un CSV/imagen sin orden visible no sirve como "ranking de
+    // necesidades", el pedido explícito del usuario).
+    ctx.fillStyle = COLOR_MARCA;
+    ctx.beginPath();
+    ctx.arc(xIzquierda, y + 8, 26, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "700 28px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(item.prioridad), xIzquierda, y + 9);
+
+    // swatch de color -- mismo criterio que ChipsColores/CompraPrioritariaCard
+    // en la app: un cuadrado de color dice más rápido que el texto "negro".
+    ctx.fillStyle = item.colorHex;
+    ctx.beginPath();
+    ctx.roundRect(xIzquierda - 18, y + 46, 36, 36, 8);
+    ctx.fill();
+    ctx.strokeStyle = COLOR_BORDE;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  ctx.fillStyle = COLOR_TITULO;
+  ctx.font = "700 34px system-ui, -apple-system, sans-serif";
+  const yNombre = y + 14;
+  if (dibujar) ctx.fillText(item.nombre, xTexto, yNombre);
+
+  ctx.fillStyle = COLOR_MARCA;
+  ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+  const yCategoria = yNombre + 38;
+  if (dibujar) ctx.fillText(`${item.categoria} · Para ${item.estilos}`, xTexto, yCategoria);
+
+  ctx.fillStyle = COLOR_TEXTO_MUTED;
+  ctx.font = "400 26px system-ui, -apple-system, sans-serif";
+  let yMotivo = yCategoria + 40;
+  const lineasMotivo = envolverTexto(item.motivo, anchoTexto, (t) => ctx.measureText(t).width);
+  for (const linea of lineasMotivo) {
+    if (dibujar) ctx.fillText(linea, xTexto, yMotivo);
+    yMotivo += 34;
+  }
+
+  ctx.fillStyle = COLOR_MARCA;
+  ctx.font = "700 26px system-ui, -apple-system, sans-serif";
+  let yPrecio = yMotivo + 6;
+  // el precio venía con un solo fillText sin envolver: con marcas caras
+  // ("de tercera a primera marca") el texto se salía del borde derecho
+  // del canvas -- mismo tratamiento que el motivo, línea por línea.
+  const lineasPrecio = envolverTexto(item.precioTexto, anchoTexto, (t) => ctx.measureText(t).width);
+  for (const linea of lineasPrecio) {
+    if (dibujar) ctx.fillText(linea, xTexto, yPrecio);
+    yPrecio += 34;
+  }
+
+  const yFinal = yPrecio + 6;
+  if (dibujar) {
+    ctx.strokeStyle = COLOR_BORDE;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(70, yFinal);
+    ctx.lineTo(ANCHO - 70, yFinal);
+    ctx.stroke();
+  }
+  return yFinal + 46;
+}
+
+/**
+ * Arma la imagen completa de la lista de regalos (encabezado de marca +
+ * título + filas numeradas por prioridad) y devuelve el PNG como Blob --
+ * mismo formato de salida que generarImagenOutfit (Blob PNG, listo para
+ * compartirOImagen). A diferencia de esa función, no hay ningún <svg> que
+ * rasterizar (no es un outfit puesto, es una lista) así que todo el
+ * dibujo es síncrono -- se mantiene async igual, mismo tipo de retorno,
+ * para que el llamador no tenga que distinguir "esta sí es async, esta no".
+ */
+export async function generarImagenListaDeseos(items: ItemListaDeseos[]): Promise<Blob> {
+  const yInicial = 260;
+
+  const medidor = document.createElement("canvas").getContext("2d");
+  if (!medidor) throw new Error("No se pudo obtener contexto 2D de canvas");
+  let yMedido = yInicial;
+  for (const item of items) yMedido = dibujarFilaListaDeseos(medidor, item, yMedido, false);
+  const alto = Math.round(yMedido + ALTO_FOOTER);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = ANCHO;
+  canvas.height = alto;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No se pudo obtener contexto 2D de canvas");
+
+  ctx.fillStyle = COLOR_FONDO;
+  ctx.fillRect(0, 0, ANCHO, alto);
+
+  dibujarIsotipo(ctx, 56, 40, 0.52);
+  ctx.fillStyle = COLOR_MARCA;
+  ctx.font = "700 34px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("MI ROPA", 130, 68);
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = COLOR_TITULO;
+  ctx.font = "700 44px system-ui, -apple-system, sans-serif";
+  ctx.fillText("🎁 Lista de regalos", ANCHO / 2, 160);
+  ctx.fillStyle = COLOR_TEXTO_MUTED;
+  ctx.font = "400 26px system-ui, -apple-system, sans-serif";
+  ctx.fillText("Ordenada por prioridad -- lo que más necesito primero", ANCHO / 2, 200);
+
+  let y = yInicial;
+  for (const item of items) y = dibujarFilaListaDeseos(ctx, item, y, true);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = COLOR_TEXTO_MUTED;
+  ctx.font = "400 22px system-ui, -apple-system, sans-serif";
+  ctx.fillText("Armado con Mi ropa", ANCHO / 2, alto - 36);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("No se pudo generar el PNG"))), "image/png");
+  });
+}
+
 export async function compartirOImagen(blob: Blob, nombreArchivo: string, tituloCompartir: string): Promise<"compartido" | "descargado" | "cancelado"> {
   const file = new File([blob], nombreArchivo, { type: "image/png" });
 

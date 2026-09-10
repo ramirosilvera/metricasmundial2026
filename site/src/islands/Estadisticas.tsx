@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { nombreColor } from "../lib/color";
 import { rangoPrecioTexto } from "../lib/precios";
+import { compartirOImagen, descargarTexto, generarCSVListaDeseos, generarImagenListaDeseos, type ItemListaDeseos } from "../lib/compartir";
 import {
   analizarFoda,
   contarPorCategoria,
@@ -14,10 +15,11 @@ import {
   type ConteoEstacion,
   type ConteoEstilo,
   type EstrategiaFoda,
+  type NecesidadDeCompra,
 } from "../lib/estadisticas";
 import { ESTILO_LABEL } from "../lib/recommend";
 import { SUPABASE_CONFIGURADO, supabase } from "../lib/supabase";
-import type { Prenda } from "../lib/types";
+import { CATEGORIA_LABEL, type Prenda } from "../lib/types";
 import ConfigWarning from "./ConfigWarning";
 
 /** Fila de gráfico de barras horizontal. `color` es opcional -- sin él,
@@ -354,6 +356,124 @@ export function CompraPrioritariaCard({
   );
 }
 
+/** Convierte el ranking crudo del motor (AnalisisFoda.necesidades) al
+ *  formato ya-listo-para-mostrar que espera compartir.ts (ver el
+ *  comentario largo de ItemListaDeseos ahí: esa capa no sabe de
+ *  catálogo/estilo/precios a propósito). Reusa CATEGORIA_LABEL/ESTILO_LABEL/
+ *  rangoPrecioTexto -- exactamente los mismos labels que ya se ven en el
+ *  resto de la app, nunca un texto inventado aparte para la exportación. */
+function aItemsListaDeseos(necesidades: NecesidadDeCompra[]): ItemListaDeseos[] {
+  return necesidades.map((n, i) => ({
+    prioridad: i + 1,
+    nombre: n.sugerida.nombre,
+    colorHex: n.sugerida.colorHex,
+    categoria: CATEGORIA_LABEL[n.sugerida.categoria],
+    estilos: n.estilos.map((e) => ESTILO_LABEL[e]).join(", "),
+    motivo: n.mensaje,
+    precioTexto: rangoPrecioTexto(n.sugerida.categoria),
+  }));
+}
+
+/** Pedido explícito del usuario: "quiero que en la sección de estadísticas
+ *  me permita exportar una imagen, csv o algo con un formato visual, con
+ *  un estado de recomendaciones ordenadas por ranking de necesidades...
+ *  para poder pasarle ese archivo a las personas para que me hagan un
+ *  regalo de cumple en función de lo que necesito." Roles de moda:
+ *  personal shopper (qué exportar) + diseñador gráfico (que la imagen se
+ *  lea bien reenviada). `necesidades` ya viene ordenado por severidad real
+ *  (mismo motor que compraPrioritaria, ver rankearNecesidades en
+ *  estadisticas.ts) -- esta tarjeta solo lo muestra y lo exporta, no
+ *  inventa un orden propio. `null`/vacío (placard sin huecos) no renderiza
+ *  nada, mismo criterio que CompraPrioritariaCard. */
+export function ListaDeRegalosCard({ necesidades }: { necesidades: NecesidadDeCompra[] }) {
+  const [exportando, setExportando] = useState<"imagen" | "csv" | null>(null);
+  const [error, setError] = useState("");
+
+  if (necesidades.length === 0) return null;
+
+  const items = aItemsListaDeseos(necesidades);
+
+  async function exportarImagen() {
+    setExportando("imagen");
+    setError("");
+    try {
+      const blob = await generarImagenListaDeseos(items);
+      await compartirOImagen(blob, "lista-de-regalos.png", "Mi lista de regalos");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar la imagen.");
+    } finally {
+      setExportando(null);
+    }
+  }
+
+  function exportarCSV() {
+    setError("");
+    try {
+      descargarTexto(generarCSVListaDeseos(items), "lista-de-regalos.csv", "text/csv");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el CSV.");
+    }
+  }
+
+  return (
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+      <div>
+        <p className="eyebrow" style={{ margin: 0 }}>
+          🎁 Lista de regalos
+        </p>
+        <p style={{ margin: "0.15rem 0 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+          Ordenada por prioridad -- pasala a quien te quiera hacer un regalo.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        {items.map((item) => (
+          <div key={item.prioridad} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
+            <span
+              style={{
+                flexShrink: 0,
+                width: "1.6rem",
+                height: "1.6rem",
+                borderRadius: "999px",
+                background: "var(--accent)",
+                color: "#fff",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {item.prioridad}
+            </span>
+            <span className="color-chip-swatch" style={{ background: item.colorHex, width: "1.6rem", height: "1.6rem", flexShrink: 0, marginTop: "0.05rem" }} />
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ fontSize: "0.85rem" }}>{item.nombre}</strong>
+              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                {item.categoria} · Para {item.estilos}
+              </span>
+              <span style={{ display: "block", fontSize: "0.75rem", color: "var(--accent)" }}>{item.precioTexto}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--danger)" }}>{error}</p>
+      )}
+
+      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-primary" onClick={exportarImagen} disabled={exportando !== null}>
+          {exportando === "imagen" ? "Armando la imagen…" : "📷 Exportar imagen"}
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={exportarCSV} disabled={exportando !== null}>
+          📄 Exportar CSV
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ChipsColores({ datos }: { datos: ConteoColor[] }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -498,6 +618,12 @@ export default function Estadisticas() {
               base={base}
               onOtraOpcion={() => setDescartadasCompra((prev) => new Set(prev).add(analisis.compraPrioritaria!.sugerida.id))}
             />
+          </div>
+        )}
+
+        {analisis.necesidades.length > 0 && (
+          <div style={{ marginBottom: "0.75rem" }}>
+            <ListaDeRegalosCard necesidades={analisis.necesidades} />
           </div>
         )}
 
