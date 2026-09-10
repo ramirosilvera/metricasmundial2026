@@ -252,6 +252,10 @@ describe("descripcionPrenda", () => {
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapatilla_running" }))).toBe("Zapatillas running");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapato_vestir" }))).toBe("Zapatos de vestir");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "mocasin" }))).toBe("Mocasines");
+    // zapatilla_cuero -- Consejo, ronda siguiente, pedido explícito del
+    // usuario con foto real de una prenda propia (sneaker de cuero, no
+    // zapato de vestir ni mocasín).
+    expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapatilla_cuero" }))).toBe("Zapatillas de cuero");
     expect(descripcionPrenda(mkPrenda("calzado", { corte_calzado: "zapatilla_lona" }))).toBe("Zapatillas de lona");
     // botín/sandalia -- ronda de completitud del catálogo (ver
     // CorteCalzado en types.ts).

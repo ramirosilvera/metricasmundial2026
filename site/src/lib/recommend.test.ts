@@ -533,6 +533,21 @@ describe("recomendar -- coordinación de cuero (cinturón/calzado)", () => {
     expect(resultado.score.nivel).toBe("con_cuidado");
   });
 
+  // Consejo, ronda siguiente -- pedido explícito del usuario, con foto real
+  // de una prenda propia ("zapatillas de cuero negras y marrones"). Es
+  // cuero real, y el motor debe reconocerlo por sí solo, igual que
+  // zapato_vestir/mocasin -- sin necesitar que además el usuario tilde
+  // textura="cuero_liso" a mano.
+  it("zapatilla de cuero cargada a mano (corte_calzado, SIN textura cuero_liso) también dispara la coordinación de cuero", () => {
+    const cinturonNegro = mkPrenda("accesorio", "#1A1A1A", 0, 0, 10);
+    cinturonNegro.textura = "cuero_liso";
+    const zapatillaCueroSinTextura = mkPrenda("calzado", "#5C3A21", 25, 47, 25);
+    zapatillaCueroSinTextura.corte_calzado = "zapatilla_cuero";
+
+    const [resultado] = recomendar(cinturonNegro, [zapatillaCueroSinTextura], [cinturonNegro, zapatillaCueroSinTextura]);
+    expect(resultado.score.nivel).toBe("con_cuidado");
+  });
+
   it("una zapatilla urbana (corte_calzado por defecto) NO dispara la coordinación de cuero, sin importar el color", () => {
     const cinturonNegro = mkPrenda("accesorio", "#1A1A1A", 0, 0, 10);
     cinturonNegro.textura = "cuero_liso";
@@ -1083,6 +1098,29 @@ describe("outfitSirveParaEstilo -- formal exige saco, todo lo demás excluye sac
     const pantalon = conPantalonVestir("formal");
     const saco = mkPrenda("saco", "#1F2A44", 222, 39, 21);
     expect(outfitSirveParaEstilo([pantalon, saco], "formal")).toBe(true);
+  });
+
+  // Consejo, ronda siguiente -- pedido explícito del usuario, con foto real
+  // de una prenda propia: "zapatillas de cuero negras y marrones... no son
+  // zapatos, tampoco son mocasines... ¿reemplaza a los mocasines?". Mismo
+  // mecanismo que la suela de contraste de arriba: un sneaker de cuero
+  // minimalista (corte_calzado="zapatilla_cuero") alcanza "oficina" sin
+  // techo pero queda excluido a propósito de "formal", aunque el outfit
+  // tenga puesto el saco.
+  it("una zapatilla de cuero (corte_calzado) NO sirve para 'formal', aunque tenga saco puesto", () => {
+    const pantalon = conPantalonVestir("formal");
+    const saco = mkPrenda("saco", "#1F2A44", 222, 39, 21);
+    const zapatillaCuero = mkPrenda("calzado", "#1C1210", 0, 0, 7);
+    zapatillaCuero.corte_calzado = "zapatilla_cuero";
+    expect(outfitSirveParaEstilo([pantalon, saco, zapatillaCuero], "formal")).toBe(false);
+  });
+
+  it("la misma zapatilla de cuero SÍ sirve para 'oficina' -- alcanza rango 2 sin techo, a diferencia de una zapatilla urbana", () => {
+    const pantalon = conPantalonVestir("formal", ["oficina"]);
+    const zapatillaCuero = mkPrenda("calzado", "#1C1210", 0, 0, 7);
+    zapatillaCuero.corte_calzado = "zapatilla_cuero";
+    expect(outfitSirveParaEstilo([pantalon, zapatillaCuero], "oficina")).toBe(true);
+    expect(advertenciasDeRegistro([pantalon, zapatillaCuero], "oficina")).toEqual([]);
   });
 
   // Consejo, ronda siguiente -- reporte real del usuario sobre su propio
@@ -2505,6 +2543,20 @@ describe("armarOutfitsSugeridos", () => {
       const [resultado] = recomendar(bermuda, [zapatoVestir], [bermuda, zapatoVestir]);
       expect(resultado.score.nivel).toBe("con_cuidado");
     });
+
+    // Consejo, ronda siguiente -- pedido explícito del usuario, con foto
+    // real de una prenda propia. Mismo motivo real que el mocasín de
+    // arriba: una zapatilla de cuero sin medias es, si algo, un look de
+    // verano TODAVÍA más común hoy que el mocasín.
+    it("bermuda + zapatilla de cuero con ocasion=laburo -> SÍ combina (misma excepción que el mocasín)", () => {
+      const bermuda = mkPrenda("bermuda", "#8C8C8C", 0, 0, 55);
+      const zapatillaCuero = mkPrenda("calzado", "#8C8C8C", 0, 0, 55);
+      zapatillaCuero.corte_calzado = "zapatilla_cuero";
+      zapatillaCuero.ocasion = "laburo";
+
+      const [resultado] = recomendar(bermuda, [zapatillaCuero], [bermuda, zapatillaCuero]);
+      expect(resultado.score.nivel).not.toBe("con_cuidado");
+    });
   });
 
   // Segunda opinión de sastrería (Consejo, ronda siguiente), verificada por
@@ -3347,6 +3399,42 @@ describe("sugerenciaDeCorteCalzado", () => {
     const catalogoSinMocasin = catalogoFormal.filter((p) => p.id !== "mocasin-negro");
     const r = sugerenciaDeCorteCalzado("formal", [pantalon, zapatoNegro, zapatoMarron], catalogoSinMocasin);
     expect(r).toBeNull(); // el único corte "nuevo" del catálogo (sandalia) no es de estilo formal
+  });
+
+  // Consejo, ronda siguiente -- pregunta explícita del usuario ("¿esta
+  // zapatilla de cuero reemplaza los mocasines?"), con foto real de una
+  // prenda propia. Respuesta del motor: NO -- son cortes DISTINTOS, cada
+  // uno tapa el hueco del otro, no el propio (mismo criterio que zapato de
+  // vestir vs. mocasín más arriba).
+  describe("zapatilla_cuero vs. mocasín -- cortes distintos, no se reemplazan", () => {
+    const catalogoOficina: (PresetPrenda & { hsl: HSL })[] = [
+      { id: "mocasin-oficina", nombre: "Mocasín negro", categoria: "calzado", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "oficina", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "mocasin" },
+      { id: "zapatilla-cuero-oficina", nombre: "Zapatillas de cuero negras", categoria: "calzado", colorHex: "#1A1A1A", textura: "cuero_liso", estilo: "oficina", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "zapatilla_cuero" },
+    ];
+
+    it("tener SOLO una zapatilla de cuero sigue marcando el hueco de mocasín -- no lo tapa", () => {
+      const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "oficina");
+      const zapatillaCuero = mkConEstilo("calzado", "#1A1A1A", 0, 0, 10, "oficina");
+      zapatillaCuero.corte_calzado = "zapatilla_cuero";
+      zapatillaCuero.textura = "cuero_liso";
+
+      const r = sugerenciaDeCorteCalzado("oficina", [pantalon, zapatillaCuero], catalogoOficina);
+      expect(r).not.toBeNull();
+      expect(r!.sugerida.id).toBe("mocasin-oficina");
+      expect(r!.mensaje).toContain("mocasín");
+    });
+
+    it("al revés: tener SOLO un mocasín sigue marcando el hueco de zapatilla de cuero -- no lo tapa", () => {
+      const pantalon = mkConEstilo("pantalon", "#1A1A1A", 0, 0, 10, "oficina");
+      const mocasin = mkConEstilo("calzado", "#1A1A1A", 0, 0, 10, "oficina");
+      mocasin.corte_calzado = "mocasin";
+      mocasin.textura = "cuero_liso";
+
+      const r = sugerenciaDeCorteCalzado("oficina", [pantalon, mocasin], catalogoOficina);
+      expect(r).not.toBeNull();
+      expect(r!.sugerida.id).toBe("zapatilla-cuero-oficina");
+      expect(r!.mensaje).toContain("zapatilla de cuero");
+    });
   });
 });
 

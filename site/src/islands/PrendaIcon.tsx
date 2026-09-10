@@ -974,6 +974,16 @@ export function PrendaShape({
           // types.ts: este corte no dibuja cordones en ningún lado).
           decoracion = <rect x="19" y="32" width="18" height="5" rx="2" fill={tonoDetalle} stroke={stroke} />;
           break;
+        case "zapatilla_cuero":
+          // sneaker de cuero minimalista (tipo Common Projects/Koio) --
+          // pedido explícito del usuario, con foto real de una prenda
+          // propia. A diferencia de TODOS los demás cortes, la seña real
+          // acá es la AUSENCIA de decoración (sin broguing, sin tira, sin
+          // 3 rayas, sin panel de malla): cuero liso sin costuras
+          // marcadas. El único detalle real es una pestaña de cuero de
+          // contraste en el talón, ver CorteCalzado en types.ts.
+          decoracion = <path d="M49 27 Q53 23.5 56.5 26.5 L55.5 32.5 Q52 30.5 49.5 32.5 Z" fill={tonoDetalle} stroke={stroke} strokeWidth={0.6} />;
+          break;
         case "zapatilla_lona":
           // puntera de goma (blanco/crema, sin importar el color de la
           // lona -- es otro material, igual criterio que la suela de

@@ -462,10 +462,24 @@ const CATEGORIAS_CUERO: Categoria[] = ["calzado", "accesorio"];
 // zapatilla?"), sin necesitar que además haya tildado la textura.
 const CORTES_DE_VESTIR: CorteCalzado[] = ["zapato_vestir", "mocasin"];
 
+// Consejo, ronda siguiente -- pedido explícito del usuario, con foto real de
+// una prenda propia: "zapatillas de cuero negras y marrones... no son
+// zapatos, tampoco son mocasines... ¿reemplaza a los mocasines?". Roles:
+// asesor de imagen + sastre. `zapatilla_cuero` (ver CorteCalzado en
+// types.ts) ES cuero real -- por eso cuenta en prendaDeCuero más abajo,
+// igual que CORTES_DE_VESTIR -- y hoy es un básico real de oficina/business
+// casual, pero NO es lo mismo que un zapato de vestir o un mocasín: nunca se
+// usa con un traje. Separada de CORTES_DE_VESTIR a propósito (no fusionada
+// en la misma lista) para poder excluirla del registro "formal" sin tocar
+// la lista que sí llega ahí -- ver el uso en rangoDeFormalidad (alcanza
+// oficina/clásico sin techo) y en outfitSirveParaEstilo (bloqueada
+// explícitamente de "formal", mismo mecanismo que ya usa suela_contraste).
+const CORTES_CUERO_CASUAL: CorteCalzado[] = ["zapatilla_cuero"];
+
 function prendaDeCuero(p: Prenda): boolean {
   if (!CATEGORIAS_CUERO.includes(p.categoria)) return false;
   if (p.textura === "cuero_liso") return true;
-  return p.categoria === "calzado" && CORTES_DE_VESTIR.includes(p.corte_calzado);
+  return p.categoria === "calzado" && (CORTES_DE_VESTIR.includes(p.corte_calzado) || CORTES_CUERO_CASUAL.includes(p.corte_calzado));
 }
 
 /** true si la prenda es una prenda de piernas de vestir/clásica -- chino,
@@ -784,7 +798,14 @@ function rangoDeFormalidad(p: Prenda): number | undefined {
   if (p.categoria === "remera" && estilosDe(p).includes("oficina")) {
     techo = techo === undefined ? 2 : Math.max(techo, 2);
   }
-  if (p.categoria === "calzado" && !CORTES_DE_VESTIR.includes(p.corte_calzado)) {
+  // zapatilla_cuero (ver CORTES_CUERO_CASUAL más arriba) queda exenta del
+  // mismo techo que zapatilla_urbana/running/lona/botin/sandalia -- alcanza
+  // rango 2 (oficina/clásico) igual que un zapato de vestir o un mocasín.
+  // Lo que SÍ la distingue de esos dos es el bloqueo explícito de "formal"
+  // en outfitSirveParaEstilo (ver más abajo) -- acá, en el rango numérico
+  // genérico, oficina y formal comparten el mismo 2 y no hay forma de
+  // diferenciarlos sin ese bloqueo aparte.
+  if (p.categoria === "calzado" && !CORTES_DE_VESTIR.includes(p.corte_calzado) && !CORTES_CUERO_CASUAL.includes(p.corte_calzado)) {
     techo = techo === undefined ? 1 : Math.min(techo, 1);
   }
   return techo !== undefined ? Math.min(rango, techo) : rango;
@@ -1065,6 +1086,14 @@ export function outfitSirveParaEstilo(prendas: Prenda[], estilo: Estilo): boolea
   // placard real del usuario: 2 de sus 3 zapatos de vestir tienen
   // suela_contraste=true y hoy aparecían igual en outfits "Formal".
   if (estilo === "formal" && prendas.some((p) => p.categoria === "calzado" && p.suela_contraste)) return false;
+  // "Formal" -- mismo mecanismo que la suela de contraste de acá arriba,
+  // pedido explícito del usuario (rol asesor de imagen), ver
+  // CORTES_CUERO_CASUAL más arriba: un sneaker de cuero minimalista es un
+  // básico real de oficina/business casual, pero nunca de un traje, sea
+  // cual sea el estilo que el usuario le haya cargado a mano. rangoDeFor-
+  // malidad ya lo deja llegar a "oficina"/"clasico" sin techo -- este es el
+  // único bloqueo que le falta para no colarse también en "formal".
+  if (estilo === "formal" && prendas.some((p) => p.categoria === "calzado" && CORTES_CUERO_CASUAL.includes(p.corte_calzado))) return false;
 
   return estilosDe(pantalon).includes(estilo);
 }
@@ -2041,9 +2070,14 @@ const CATEGORIAS_PIERNAS_VERANIEGAS: Categoria[] = ["bermuda", "short_deportivo"
  *  `corte_calzado` (ver types.ts) -- acá se lo usa como señal de primera
  *  clase por primera vez en el motor. zapato_vestir SIGUE bloqueado (no
  *  está en la excepción): un zapato de vestir con cordones nunca es un
- *  calzado de verano informal, a diferencia del mocasín. */
+ *  calzado de verano informal, a diferencia del mocasín.
+ *
+ *  zapatilla_cuero (ver CorteCalzado en types.ts, ronda siguiente): misma
+ *  excepción que el mocasín, por el mismo motivo real -- un sneaker de
+ *  cuero minimalista con bermuda es, si algo, un look de verano TODAVÍA más
+ *  común hoy que el mocasín sin medias. */
 function esDeOficina(p: Prenda): boolean {
-  if (p.categoria === "calzado" && p.corte_calzado === "mocasin") return false;
+  if (p.categoria === "calzado" && (p.corte_calzado === "mocasin" || p.corte_calzado === "zapatilla_cuero")) return false;
   return p.ocasion === "laburo" || p.ocasion === "formal";
 }
 
@@ -3401,6 +3435,7 @@ const CORTE_CALZADO_LABEL: Record<CorteCalzado, string> = {
   zapatilla_running: "una zapatilla running",
   zapato_vestir: "un zapato de vestir",
   mocasin: "un mocasín",
+  zapatilla_cuero: "una zapatilla de cuero",
   zapatilla_lona: "una zapatilla de lona",
   botin: "un botín",
   sandalia: "una sandalia",

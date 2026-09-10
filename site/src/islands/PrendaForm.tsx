@@ -444,6 +444,7 @@ export default function PrendaForm() {
                     <option value="zapatilla_running">Zapatilla running (técnica, deportiva)</option>
                     <option value="zapato_vestir">Zapato de vestir (con cordones)</option>
                     <option value="mocasin">Mocasín (sin cordones)</option>
+                    <option value="zapatilla_cuero">Zapatilla de cuero (sneaker minimalista, con cordones)</option>
                     <option value="zapatilla_lona">Zapatilla de lona</option>
                     <option value="botin">Botín / bota (caña sobre el tobillo)</option>
                     <option value="sandalia">Sandalia (sin capellada, de verano)</option>
