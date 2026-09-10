@@ -415,6 +415,34 @@ describe("compraDeMayorImpacto", () => {
     expect(compraDeMayorImpacto([], [])).toBeNull();
   });
 
+  // Consejo, ronda siguiente -- pedido explícito del usuario: "revisa el
+  // motor y la UI de recomendación de compras, no solo te bases en el color
+  // sino tmb en el tipo y estilo de prendas". huecoDeEstilo (interno acá)
+  // duplica la MISMA cadena de auditoriaDeGuardarropa en recommend.ts, capa
+  // por capa -- este test es justamente para que las capas 7/8 nuevas
+  // (sugerenciaDeCorteCalzado/sugerenciaDeAccesorio) no queden agregadas en
+  // un solo lado y desincronizadas en el otro, el mismo riesgo real que ya
+  // advierte el comentario de TierHueco.
+  it("ancla, torso/color y CANTIDAD de calzado ya cubiertos, pero todo el mismo corte -> tier 7 (sugerenciaDeCorteCalzado)", () => {
+    const catalogoConMocasin: (PresetPrenda & { hsl: HSL })[] = [
+      { id: "mocasin-casual", nombre: "Mocasín casual", categoria: "calzado", colorHex: "#1A1A1A", estilo: "casual", hsl: { h: 0, s: 0, l: 10 }, corteCalzado: "mocasin" },
+    ];
+    const pantalonCasual = mkPrenda("pantalon", "#1A1A1A", 0, 0, 10, "casual");
+    const remera1 = mkPrenda("remera", "#1A1A1A", 0, 0, 10, "casual");
+    const remera2 = mkPrenda("remera", "#FFFFFF", 0, 0, 95, "casual");
+    const zapato1 = mkPrenda("calzado", "#1A1A1A", 0, 0, 10, "casual");
+    const zapato2 = mkPrenda("calzado", "#FFFFFF", 0, 0, 95, "casual");
+    // por default (mkPrenda) los dos ya son corte_calzado "zapatilla_urbana"
+    // -- el hueco real: 2+ pares, colores distintos, pero un solo corte.
+    const placard = [pantalonCasual, remera1, remera2, zapato1, zapato2];
+
+    const r = compraDeMayorImpacto(placard, catalogoConMocasin);
+    expect(r).not.toBeNull();
+    expect(r!.estilo).toBe("casual");
+    expect(r!.sugerida.id).toBe("mocasin-casual");
+    expect(r!.mensaje).toContain("mismo corte");
+  });
+
   it("analizarFoda expone la misma recomendación como compraPrioritaria, consistente con sus propias oportunidades", () => {
     const r = analizarFoda([mkPrenda("camisa", "#FFFFFF", 0, 0, 95, "clasico")]);
     expect(r.compraPrioritaria).not.toBeNull();
