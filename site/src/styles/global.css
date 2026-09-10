@@ -835,6 +835,26 @@ body.tiene-aviso-actualizacion {
   border-radius: 10px;
   padding: 0.35rem;
 }
+/* Foto real de la prenda (ver el comentario largo de `fotoUrls` en
+   Placard.tsx) -- mismo tamaño/radio que .prenda-card-icon para que la
+   grilla no salte según si esa prenda tiene foto o no, pero sin el padding
+   del ícono (una foto real aprovecha todo el recuadro) y con overflow
+   oculto + object-fit: cover porque, a diferencia del ícono sintético
+   (dibujado a medida), una foto real puede venir en cualquier proporción. */
+.prenda-card-foto {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.prenda-card-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 .probar-banner {
   display: flex;

@@ -3,6 +3,7 @@ import { SUPABASE_CONFIGURADO, supabase } from "../lib/supabase";
 import { nombreColor } from "../lib/color";
 import { CATALOGO_CON_HSL, presetAPrendaSintetica } from "../lib/catalogo";
 import { compartirOImagen, generarImagenOutfit } from "../lib/compartir";
+import { rangoPrecioTexto } from "../lib/precios";
 import {
   advertenciasDeRegistro,
   armarOutfitsParaComprar,
@@ -1032,6 +1033,16 @@ export function Contenido({
                       Subiría a <Estrellas puntaje={tarjetaSugerencia.conSugerencia} />.
                     </>
                   )}
+                  {/* Ver el comentario largo de rangoPrecioTexto en precios.ts:
+                      auditoría de Consejo (rol: comprador retail), pedido
+                      explícito del usuario -- una recomendación de compra sin
+                      referencia de plata no ayuda a decidir. Una línea por
+                      prenda sugerida (comboExcelencia puede traer 2 a la vez). */}
+                  {tarjetaSugerencia.sugeridas.map((s) => (
+                    <span key={s.id} style={{ display: "block", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      💵 {rangoPrecioTexto(s.categoria)}
+                    </span>
+                  ))}
                 </p>
                 {/* comboExcelencia puede sugerir 2 prendas a la vez (ver su
                     comentario en recommend.ts) -- un botón por prenda, cada
@@ -1094,7 +1105,12 @@ export function Contenido({
               auditoria && (
                 <div className="card" style={{ marginTop: "0.6rem", display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontSize: "1.2rem" }}>🧑‍🎨</span>
-                  <p style={{ margin: 0, fontSize: "0.85rem", flex: 1 }}>{auditoria.mensaje}</p>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: "0.85rem" }}>{auditoria.mensaje}</p>
+                    <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      💵 {rangoPrecioTexto(auditoria.sugerida.categoria)}
+                    </p>
+                  </div>
                   <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -1229,6 +1245,9 @@ export function Contenido({
                   </p>
                   <PuntajeBadge prendas={prendasOutfit} precomputado={{ puntaje: s.puntaje, explicacion: s.explicacionPuntaje }} />
                   <RegistroBadge prendas={prendasOutfit} />
+                  <p style={{ margin: "0.3rem 0 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                    💵 {rangoPrecioTexto(s.sugerida.categoria)}
+                  </p>
                 </div>
                 <button
                   type="button"

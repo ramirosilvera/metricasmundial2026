@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { nombreColor } from "../lib/color";
+import { rangoPrecioTexto } from "../lib/precios";
 import {
   analizarFoda,
   contarPorCategoria,
@@ -313,6 +314,17 @@ export function CompraPrioritariaCard({ compra, base }: { compra: CompraPriorita
           <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>{compra.mensaje}</span>
         </div>
       </div>
+      {/* Auditoría de Consejo (roles: personal shopper/comprador retail),
+          pedido explícito del usuario: "el motor de compras nunca habla de
+          plata" fue el hallazgo más serio de esa revisión -- una
+          recomendación de compra sin ninguna referencia de precio no ayuda
+          a decidir. Ver precios.ts sobre el método (investigación real vía
+          WebSearch, Mercado Libre/Shein/primeras marcas para Argentina) y
+          su limitación declarada (rango orientativo, no un precio de un
+          SKU puntual en tiempo real). */}
+      <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--text-muted)" }}>
+        💵 {rangoPrecioTexto(compra.sugerida.categoria)}
+      </p>
       <button type="button" className="btn btn-primary" onClick={() => cargarSugerenciaDeCompra(compra.sugerida, base)}>
         Cargar esta prenda
       </button>

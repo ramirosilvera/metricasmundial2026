@@ -39,6 +39,7 @@ export function Contenido({
   prendas,
   base,
   onGuardarEdicion,
+  fotoUrls,
 }: {
   prendas: Prenda[];
   base: string;
@@ -49,6 +50,29 @@ export function Contenido({
    *  de datos de prueba (ver el comentario de Contenido) puede montarse
    *  sin esta prop, sin botón de edición. */
   onGuardarEdicion?: (p: Prenda, cambios: CambiosPrenda) => void;
+  /** Auditoría de Consejo (rol: producto/UX), pedido explícito del
+   *  usuario: "revisá la aplicación... si le falta algo para funcionar
+   *  como un gestor de placard real". Hallazgo real, verificado leyendo el
+   *  código completo: PrendaForm.tsx ya subía la foto real de la prenda a
+   *  Supabase Storage (bucket "armario-fotos") desde hacía varias rondas,
+   *  pero NINGÚN lugar de la app la volvía a mostrar -- se subía y
+   *  desaparecía para siempre, todo se dibujaba con el ícono sintético
+   *  (PrendaIcon) sin excepción. El bucket es privado (RLS: solo el dueño,
+   *  ver migración 0006), así que no alcanza con una URL pública --
+   *  `fotoUrls` es un mapa foto_path -> URL firmada (createSignedUrls,
+   *  UNA sola llamada batch para todo el placard, calculado en el default
+   *  export de abajo, que es el único que sabe de Supabase) que esta
+   *  parte "pura" recibe ya resuelto, mismo patrón que onGuardarEdicion.
+   *  Opcional (undefined = sin fotos, mismo criterio que onGuardarEdicion)
+   *  para que el snapshot de datos de prueba siga funcionando sin
+   *  Supabase real. Alcance deliberado: SOLO acá (la grilla del placard,
+   *  donde cada prenda se ve suelta) -- Maniqui.tsx sigue dibujando el
+   *  ícono sintético en outfits armados, porque componer fotos reales
+   *  sueltas sobre una silueta puesta es un problema visual distinto (y
+   *  mucho más difícil) que mostrar la miniatura de una prenda individual;
+   *  prometer eso sin poder dibujarlo de verdad repetiría el mismo error
+   *  que esta sesión ya corrigió varias veces con patrones/colores. */
+  fotoUrls?: Record<string, string>;
 }) {
   const [filtroEstilo, setFiltroEstilo] = useState<Estilo | null>(null);
   const [filtroColor, setFiltroColor] = useState<string | null>(null);
@@ -243,25 +267,35 @@ export function Contenido({
                   // .prenda-card/.prenda-card-link en global.css.
                   <div key={p.id} className="card prenda-card">
                     <a href={`${base}combinar/?prenda=${p.id}`} className="prenda-card-link">
-                      <span className="prenda-card-icon">
-                        <PrendaIcon
-                          categoria={p.categoria}
-                          color={p.color_hex}
-                          textura={p.textura ?? undefined}
-                          estacion={p.estacion}
-                          suelaContraste={p.suela_contraste}
-                          posicionAccesorio={p.posicion_accesorio}
-                          requiereCuello={p.requiere_cuello}
-                          conCapucha={p.con_capucha}
-                          patron={p.patron}
-                          color2={p.color2_hex}
-                          color3={p.color3_hex}
-                          corteCalzado={p.corte_calzado}
-                          calce={p.calce}
-                          cuello={p.cuello}
-                          manga={p.manga}
-                        />
-                      </span>
+                      {p.foto_path && fotoUrls?.[p.foto_path] ? (
+                        // Foto real de la prenda -- ver el comentario largo de
+                        // `fotoUrls` más arriba. object-fit: cover porque es una
+                        // foto real (proporciones libres), a diferencia del
+                        // ícono sintético que sí se dibuja a medida.
+                        <span className="prenda-card-foto">
+                          <img src={fotoUrls[p.foto_path]} alt="" loading="lazy" />
+                        </span>
+                      ) : (
+                        <span className="prenda-card-icon">
+                          <PrendaIcon
+                            categoria={p.categoria}
+                            color={p.color_hex}
+                            textura={p.textura ?? undefined}
+                            estacion={p.estacion}
+                            suelaContraste={p.suela_contraste}
+                            posicionAccesorio={p.posicion_accesorio}
+                            requiereCuello={p.requiere_cuello}
+                            conCapucha={p.con_capucha}
+                            patron={p.patron}
+                            color2={p.color2_hex}
+                            color3={p.color3_hex}
+                            corteCalzado={p.corte_calzado}
+                            calce={p.calce}
+                            cuello={p.cuello}
+                            manga={p.manga}
+                          />
+                        </span>
+                      )}
                       <strong style={{ fontSize: "0.85rem" }}>{descripcionPrenda(p)}</strong>
                       <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                         {nombreColor(p.color_h, p.color_s, p.color_l)}
@@ -440,6 +474,15 @@ export default function Placard() {
   const [prendas, setPrendas] = useState<Prenda[] | null>(null);
   const [sesion, setSesion] = useState<"cargando" | "sin_sesion" | "ok" | "error">("cargando");
   const [error, setError] = useState("");
+  // Ver el comentario largo de `fotoUrls` en Contenido más arriba. Se
+  // calcula acá (el único lugar que ya sabe de Supabase) con UNA sola
+  // llamada batch (createSignedUrls) para todas las fotos del placard, en
+  // vez de una llamada por tarjeta -- el bucket es privado (RLS: solo el
+  // dueño, migración 0006), así que getPublicUrl no sirve. Fallas
+  // puntuales (una foto borrada del storage pero con foto_path colgado en
+  // la fila) se ignoran a propósito: esa tarjeta simplemente cae al ícono
+  // sintético, mismo comportamiento que una prenda sin foto.
+  const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
   const base = (import.meta.env.BASE_URL as string) || "/";
 
   useEffect(() => {
@@ -460,7 +503,20 @@ export default function Placard() {
           setError(err.message);
           return;
         }
-        setPrendas((rows as Prenda[] | null) ?? []);
+        const cargadas = (rows as Prenda[] | null) ?? [];
+        setPrendas(cargadas);
+
+        const paths = [...new Set(cargadas.map((p) => p.foto_path).filter((p): p is string => p !== null))];
+        if (paths.length > 0) {
+          const { data: firmadas } = await supabase.storage.from("armario-fotos").createSignedUrls(paths, 3600);
+          if (firmadas) {
+            const mapa: Record<string, string> = {};
+            for (const f of firmadas) {
+              if (f.signedUrl && !f.error) mapa[f.path ?? ""] = f.signedUrl;
+            }
+            setFotoUrls(mapa);
+          }
+        }
       })
       .catch((e: Error) => {
         setSesion("error");
@@ -515,5 +571,5 @@ export default function Placard() {
     await supabase.from("prendas").update(cambios).eq("id", p.id);
   }
 
-  return <Contenido prendas={prendas} base={base} onGuardarEdicion={guardarEdicion} />;
+  return <Contenido prendas={prendas} base={base} onGuardarEdicion={guardarEdicion} fotoUrls={fotoUrls} />;
 }
