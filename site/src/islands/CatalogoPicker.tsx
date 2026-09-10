@@ -6,14 +6,31 @@ import PrendaIcon from "./PrendaIcon";
 /** Mismo orden que FORMALIDAD_ESTILO en recommend.ts (de más a menos
  *  formal) -- pedido explícito del usuario: "que quede claramente
  *  diferenciado ropa de oficina, urbana, clásica, etc." en el catálogo, no
- *  solo en la lógica de combinación. El texto de "Formal" incluye
- *  "(oficina)" acá -- en el encabezado de sección, más descriptivo que se
- *  puede permitir -- porque es la palabra que usó el usuario, pero el
- *  ESTILO_LABEL compacto de recommend.ts (el que se usa en el badge chico
- *  de Outfits) se deja como estaba para no romper esa etiqueta ya
- *  establecida. */
+ *  solo en la lógica de combinación.
+ *
+ *  Bug real encontrado (Consejo, ronda siguiente), reportado por el
+ *  usuario: "no veo las zapatillas de cuero en el catálogo". Esta lista se
+ *  armó cuando "oficina" todavía no tenía NINGUNA prenda con ESE estilo
+ *  como principal (por eso el título original decía "Formal (oficina)",
+ *  tratando oficina como una aclaración de formal, no como su propia
+ *  sección) -- pero varias rondas después ya hay 9 prendas reales con
+ *  estilo="oficina" (pantalón/campera de gabardina, y ahora las 2
+ *  zapatillas de cuero). `grupos` (más abajo) SÍ las agrupa bajo la key
+ *  "oficina" -- el bug no es de filtrado, es de RENDER: el `.map` de
+ *  SECCIONES nunca iteraba esa key porque no estaba en esta lista, y la
+ *  sección "Otros" tampoco la agarra (esa es solo para `p.estilo` nulo,
+ *  key literal "otros"). Resultado: 9 prendas cargadas en el catálogo,
+ *  invisibles en el picker sin ningún error visible. Todos los demás
+ *  enumerados de Estilo del código (ESTILOS/ESTILOS_FILTRO en
+ *  PrendaForm/Outfits/Placard/Recomendaciones/estadisticas.ts) sí incluían
+ *  "oficina" -- confirmado por grep, este archivo era el único desactualizado.
+ *  Se agrega la sección propia "Oficina" (mismo lugar que esos otros
+ *  archivos: justo después de "formal") y se revierte el título de
+ *  "Formal" a secas -- ya no hace falta la aclaración "(oficina)" ahora
+ *  que oficina tiene su propia sección real. */
 const SECCIONES: { estilo: Estilo; titulo: string }[] = [
-  { estilo: "formal", titulo: "Formal (oficina)" },
+  { estilo: "formal", titulo: "Formal" },
+  { estilo: "oficina", titulo: "Oficina" },
   { estilo: "clasico", titulo: "Clásico" },
   { estilo: "urbano", titulo: "Urbano" },
   { estilo: "casual", titulo: "Casual" },
